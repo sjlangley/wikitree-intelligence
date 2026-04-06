@@ -1,0 +1,74 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+dist/
+build/
+site/
+*.egg-info/
+.venv/
+venv/
+ENV/
+env/
+
+# Node / frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.npm/
+.yarn/
+.turbo/
+.next/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Monorepo app outputs
+apps/*/node_modules/
+apps/*/coverage/
+apps/*/dist/
+apps/*/build/
+apps/*/.vite/
+apps/*/.next/
+apps/*/.pytest_cache/
+apps/*/.mypy_cache/
+apps/*/.ruff_cache/
+
+# Database / local runtime artifacts
+*.sqlite
+*.sqlite3
+postgres-data/
+.docker/
+
+# Logs / temp files
+*.log
+tmp/
+temp/
