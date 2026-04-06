@@ -59,4 +59,5 @@ jobs:
           files: apps/ui/coverage/lcov.info
           flags: ui
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
