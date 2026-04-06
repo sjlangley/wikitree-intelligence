@@ -1,4 +1,4 @@
-name: Golf UI CI
+name: UI CI
 
 on:
   push:
