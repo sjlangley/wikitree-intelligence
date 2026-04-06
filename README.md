@@ -26,9 +26,9 @@ Current source-of-truth docs:
 ## Planned Stack
 
 - `apps/api/` — Python backend
-- `apps/web/` — React + TypeScript frontend
+- `apps/ui/` — React + TypeScript frontend
 - `apps/api/tests/` — backend tests
-- `apps/web/tests/` — frontend tests
+- `apps/ui/tests/` — frontend tests
 - `e2e/` — Playwright end-to-end tests
 - `migrations/` — database migrations
 - `docker-compose.yml` — local orchestration
