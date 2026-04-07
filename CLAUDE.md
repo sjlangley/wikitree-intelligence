@@ -865,6 +865,7 @@ app = FastAPI(lifespan=lifespan)
 - Be easy to review (< 400 lines changed preferred)
 - Pass all tests (UI: `npm run test:ci`, API: `pytest`)
 - Pass linting (UI: `npm run lint`, API: `ruff check`)
+- Pass formatting (UI: `npm run format:check`, API: `ruff format --check`)
 - Pass type checking (UI: `npm run build`, API: `pyrefly check`)
 - Maintain or improve code coverage (target: 80%+)
 
@@ -874,6 +875,7 @@ app = FastAPI(lifespan=lifespan)
 cd apps/ui
 npm run lint:fix
 npm run format
+npm run format:check  # Verify formatting
 npm run test
 npm run build
 ```
@@ -884,6 +886,7 @@ npm run build
 cd apps/api
 ruff check src/
 ruff format src/
+ruff format --check src/  # Verify formatting
 pyrefly check src/
 pytest -v
 ```

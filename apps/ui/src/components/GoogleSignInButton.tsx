@@ -14,7 +14,7 @@ export function GoogleSignInButton() {
   const [isGoogleLoaded, setIsGoogleLoaded] = useState(() => !!window.google);
   const [sdkLoadError, setSdkLoadError] = useState(false);
   const initializationRef = useRef(false);
-  
+
   // Read env var inside component for better testability
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -103,8 +103,8 @@ export function GoogleSignInButton() {
   if (sdkLoadError) {
     return (
       <div className="google-signin-error">
-        Failed to load Google Sign-In. Please check your internet connection and ensure
-        third-party scripts are not blocked.
+        Failed to load Google Sign-In. Please check your internet connection and ensure third-party
+        scripts are not blocked.
       </div>
     );
   }
