@@ -49,7 +49,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="landing-panel" aria-label="Product promise">
+        <section className="landing-panel" aria-label="Product promise">
           <div className="metric-grid">
             <article className="metric-card">
               <span className="metric-label">Resolved</span>
@@ -75,7 +75,7 @@ export default function App() {
               UI and dashboard-card sludge.
             </p>
           </div>
-        </div>
+        </section>
       </section>
 
       <section className="landing-section">
