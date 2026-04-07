@@ -1,0 +1,45 @@
+"""This module defines the configuration settings for the application.
+
+It uses Pydantic's BaseSettings to load environment variables from a `.env`
+file.
+"""
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from api.enums import Environment
+
+
+class Settings(BaseSettings):
+    """The application settings."""
+
+    model_config = SettingsConfigDict(env_file='.env')
+
+    log_level: str = Field(default='INFO', alias='LOG_LEVEL')
+
+    # For authentication
+
+    # Disable authentication for development
+    auth_disabled: bool = Field(default=False, alias='AUTH_DISABLED')
+
+    # Environment setting (e.g., 'development', 'production')
+    environment: Environment = Field(
+        default=Environment.PRODUCTION, alias='ENVIRONMENT'
+    )
+
+    client_id: str = Field(
+        ...,
+        description='The Google OAuth client ID for verifying bearer tokens.',
+        alias='GOOGLE_OAUTH_CLIENT_ID',
+    )
+
+    # For CORS Policy used in CORS middleware.
+
+    # FastAPI’s CORS middleware does NOT support wildcard subdomains.
+    # Ensure to include all specific subdomains for the web application.
+    client_origins: list[str] = Field(
+        default_factory=list, alias='CLIENT_ORIGINS'
+    )
+
+
+settings = Settings()  # pyrefly: ignore[missing-argument]
