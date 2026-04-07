@@ -1,42 +1,100 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../src/App';
+import * as auth from '../src/lib/auth';
+import type { AuthState } from '../src/lib/auth';
+
+// Mock the auth module
+vi.mock('../src/lib/auth', async () => {
+  const actual = await vi.importActual('../src/lib/auth');
+  return {
+    ...actual,
+    useAuth: vi.fn(),
+  };
+});
+
+// Mock GoogleSignInButton component
+vi.mock('../src/components/GoogleSignInButton', () => ({
+  GoogleSignInButton: () => <div data-testid="google-signin-button">Sign In with Google</div>,
+}));
 
 describe('App', () => {
+  const mockUseAuth = vi.mocked(auth.useAuth);
+
   beforeEach(() => {
-    render(<App />);
+    vi.clearAllMocks();
   });
 
-  it('renders get started heading', () => {
+  it('renders loading state', () => {
+    const loadingState: AuthState = { status: 'loading' };
+    mockUseAuth.mockReturnValue({
+      authState: loadingState,
+      loginWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    render(<App />);
+
+    expect(screen.getByTestId('loading-state')).toBeDefined();
+    expect(screen.getByText('Loading...')).toBeDefined();
+  });
+
+  it('renders unauthenticated state with sign-in button', () => {
+    const unauthenticatedState: AuthState = { status: 'unauthenticated' };
+    mockUseAuth.mockReturnValue({
+      authState: unauthenticatedState,
+      loginWithGoogle: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    render(<App />);
+
     const heading = screen.getByRole('heading', {
-      name: /get started/i,
+      name: /wikitree intelligence/i,
     });
     expect(heading).toBeDefined();
+
+    const subtitle = screen.getByText(/local-first genealogy workbench/i);
+    expect(subtitle).toBeDefined();
+
+    const signInButton = screen.getByTestId('google-signin-button');
+    expect(signInButton).toBeDefined();
   });
 
-  it('renders documentation section', () => {
-    const docsHeading = screen.getByRole('heading', {
-      name: /documentation/i,
+  it('renders authenticated state with user info', () => {
+    const authenticatedState: AuthState = {
+      status: 'authenticated',
+      user: {
+        userid: 'test-user-123',
+        email: 'test@example.com',
+        name: 'Test User',
+      },
+    };
+    mockUseAuth.mockReturnValue({
+      authState: authenticatedState,
+      loginWithGoogle: vi.fn(),
+      logout: vi.fn(),
     });
-    expect(docsHeading).toBeDefined();
-  });
 
-  it('renders connect with us section', () => {
-    const socialHeading = screen.getByRole('heading', {
-      name: /connect with us/i,
+    render(<App />);
+
+    const heading = screen.getByRole('heading', {
+      name: /wikitree intelligence/i,
     });
-    expect(socialHeading).toBeDefined();
-  });
+    expect(heading).toBeDefined();
 
-  it('displays counter button', () => {
-    const button = screen.getByRole('button', {
-      name: /count is 0/i,
+    const loggedInHeading = screen.getByRole('heading', {
+      name: /you are logged in/i,
     });
-    expect(button).toBeDefined();
-  });
+    expect(loggedInHeading).toBeDefined();
 
-  it('displays HMR message', () => {
-    const hmrText = screen.getByText(/save to test/i);
-    expect(hmrText).toBeDefined();
+    // Check user details are displayed
+    expect(screen.getByText(/test-user-123/i)).toBeDefined();
+    expect(screen.getByText(/test@example.com/i)).toBeDefined();
+    expect(screen.getByText(/Test User/i)).toBeDefined();
+
+    // Check logout button is present
+    const logoutButton = screen.getByRole('button', { name: /logout/i });
+    expect(logoutButton).toBeDefined();
   });
 });
