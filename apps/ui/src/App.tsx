@@ -53,17 +53,17 @@ export default function App() {
           <div className="metric-grid">
             <article className="metric-card">
               <span className="metric-label">Resolved</span>
-              <strong>184</strong>
+              <strong>Ready to reconcile</strong>
               <p>Confirmed links you do not need to think about again.</p>
             </article>
             <article className="metric-card">
               <span className="metric-label">Needs review</span>
-              <strong>37</strong>
+              <strong>Human judgment needed</strong>
               <p>Possible matches that still need a human call.</p>
             </article>
             <article className="metric-card">
               <span className="metric-label">Missing</span>
-              <strong>12</strong>
+              <strong>Manual creation possible</strong>
               <p>Profiles the API could not match and you may need to create manually.</p>
             </article>
           </div>
