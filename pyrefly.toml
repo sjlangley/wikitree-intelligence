@@ -1,0 +1,5 @@
+python_version = "3.12"
+
+site_package_paths = [
+    "apps/api/src",
+]
