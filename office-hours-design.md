@@ -237,6 +237,21 @@ people, relationships, evidence packets, and match state cleanly, and it can lat
 to a cloud platform with minimal conceptual churn. SQLite is acceptable only if speed of
 initial prototyping clearly outweighs the migration cost.
 
+Use PostgreSQL as the only system of record for version 1 and version 2 planning.
+Do not introduce ArangoDB or any other graph database in the initial architecture.
+
+Why:
+
+- the product is not just family traversal, it is also auth, resumable jobs, review
+  receipts, evidence packets, and later sync-review queues
+- these are transactional application concerns, and PostgreSQL is the boring right tool
+- genealogical traversal can still be expressed with relational edges plus recursive
+  queries
+- a dual-store design would create sync, backfill, and consistency problems too early
+
+If a graph database is ever introduced later, it should be a derived read model fed from
+PostgreSQL, not a second co-primary store.
+
 Suggested version 1 stack shape:
 
 - monorepo layout with runnable apps under `apps/`
@@ -252,7 +267,7 @@ Recommended repo shape:
 apps/
   api/
     tests/
-  web/
+  ui/
     src/
     tests/
 e2e/
@@ -266,6 +281,185 @@ associate:
 - confirmed, rejected, deferred, and derived matches
 - WikiTree authenticated session state
 - preferences and future source connections
+
+## Initial Schema Proposal
+
+Keep one canonical relational model in PostgreSQL.
+
+Core tables:
+
+- `app_users`
+  Google-authenticated app users.
+- `app_sessions`
+  Backend-owned sessions for signed-in users.
+- `wikitree_connections`
+  Per-user WikiTree connection state, session metadata, and visibility scope.
+- `import_jobs`
+  One row per GEDCOM import, including top-level status and current stage.
+- `import_job_stages`
+  Stage-by-stage checkpoints, retry state, errors, and progress metadata.
+- `people`
+  Canonical local person records used by matching, traversal, and sync review.
+- `person_names`
+  Structured and normalized names for one person, including alternate spellings.
+- `person_facts`
+  Facts like birth, death, places, notes, and relationship-adjacent metadata.
+- `relationships`
+  Directed edges between people such as parent, child, spouse, sibling, with source and
+  inferred flags.
+- `sources`
+  Normalized source records and provenance references.
+- `external_identities`
+  Links from a canonical local person to external systems like GEDCOM records or WikiTree
+  profiles.
+- `match_reviews`
+  Snapshot-backed review receipts for candidate matching decisions.
+- `evidence_packets`
+  Frozen evidence summaries and provenance attached to a review record.
+- `sync_review_items`
+  Later enrichment queue items for already-matched profiles with GEDCOM-only facts.
+
+Suggested table responsibilities:
+
+```text
+app_users
+  id
+  google_subject
+  email
+  display_name
+  created_at
+
+app_sessions
+  id
+  user_id -> app_users.id
+  expires_at
+  created_at
+  last_seen_at
+
+wikitree_connections
+  id
+  user_id -> app_users.id
+  wikitree_user_key
+  status
+  session_ref
+  connected_at
+  expires_at
+  last_verified_at
+
+import_jobs
+  id
+  user_id -> app_users.id
+  source_type
+  original_filename
+  status
+  current_stage
+  created_at
+  started_at
+  completed_at
+
+import_job_stages
+  id
+  import_job_id -> import_jobs.id
+  stage_name
+  status
+  checkpoint_json
+  error_message
+  started_at
+  completed_at
+
+people
+  id
+  primary_name
+  birth_year
+  death_year
+  is_living
+  created_at
+  updated_at
+
+person_names
+  id
+  person_id -> people.id
+  name_type
+  full_name
+  given_names
+  surname
+  normalized_name
+
+person_facts
+  id
+  person_id -> people.id
+  fact_type
+  fact_value_json
+  date_text
+  place_text
+  source_id -> sources.id
+
+relationships
+  id
+  from_person_id -> people.id
+  to_person_id -> people.id
+  relationship_type
+  source_id -> sources.id
+  is_inferred
+
+sources
+  id
+  source_type
+  citation_text
+  source_detail_json
+  imported_from
+
+external_identities
+  id
+  person_id -> people.id
+  provider
+  external_key
+  visibility_scope
+  imported_at
+  last_seen_at
+
+match_reviews
+  id
+  import_job_id -> import_jobs.id
+  user_id -> app_users.id
+  subject_person_id -> people.id
+  candidate_person_id -> people.id
+  status
+  classification
+  score
+  derived_from_review_id -> match_reviews.id
+  created_at
+  decided_at
+
+evidence_packets
+  id
+  match_review_id -> match_reviews.id
+  summary_json
+  provenance_json
+  created_at
+
+sync_review_items
+  id
+  user_id -> app_users.id
+  person_id -> people.id
+  match_review_id -> match_reviews.id
+  status
+  diff_json
+  provenance_json
+  created_at
+```
+
+Modeling rules:
+
+- use `people` as the canonical local node for all downstream workflows
+- use `external_identities` to attach GEDCOM records and WikiTree profiles to canonical
+  people
+- use `relationships` as the graph edge table instead of introducing a separate graph
+  database
+- use recursive SQL over `relationships` for outward traversal
+- use `jsonb` only where flexibility is useful, such as checkpoints, evidence summaries,
+  and structured source details
+- keep review receipts immutable enough to preserve why a decision was made at that time
 
 Authentication should be handled as a first-class backend concern:
 
@@ -453,6 +647,9 @@ Without this, large-import recovery and private-data workflows become brittle.
 14. Define the later sync-review model:
    how matched profiles with extra GEDCOM data are queued, compared, and prepared for
    manual WikiTree update decisions.
+15. Turn the schema proposal above into the first migration set for `app_users`,
+    `wikitree_connections`, `import_jobs`, `people`, `relationships`, `match_reviews`,
+    and `sync_review_items`.
 
 ## What I noticed about how you think
 

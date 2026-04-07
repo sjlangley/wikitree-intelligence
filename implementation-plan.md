@@ -29,12 +29,19 @@ Ship version 1 of the WikiTree Match Workbench as a local-first web app that:
 
 - Backend: Python
 - Frontend: React + TypeScript
-- Database: PostgreSQL
+- Database: PostgreSQL as the only source of truth
 - Local orchestration: Docker Compose
 - Backend tests: `pytest`
 - Frontend tests: `vitest`
 - E2E tests: `playwright`
 - CI: GitHub Actions
+
+Datastore decision:
+
+- use PostgreSQL only for version 1
+- do not add ArangoDB or another graph database in the initial build
+- if graph-specific read workloads become a real bottleneck later, add a derived graph
+  projection from PostgreSQL instead of a second primary datastore
 
 ## Repo Shape
 
@@ -44,7 +51,7 @@ Keep it boring:
 apps/
   api/
     tests/
-  web/
+  ui/
     src/
     tests/
 e2e/
@@ -55,7 +62,7 @@ migrations/
 Use `apps/` as the monorepo home for runnable applications. In version 1 that means:
 
 - `apps/api/`
-- `apps/web/`
+- `apps/ui/`
 
 Do not introduce extra packages, workers, or shared libraries in v1 unless a later PR
 proves the duplication is real. Shared code should live inside one app until duplication
@@ -64,7 +71,7 @@ is real enough to justify extraction.
 ## Architecture Spine
 
 ```text
-[web SPA]
+[ui SPA]
    |
    v
 [api]
@@ -88,9 +95,9 @@ Files:
 - `pyproject.toml`
 - `apps/api/app.py`
 - `apps/api/tests/test_health.py`
-- `apps/web/package.json`
-- `apps/web/src/App.tsx`
-- `apps/web/tests/App.test.tsx`
+- `apps/ui/package.json`
+- `apps/ui/src/App.tsx`
+- `apps/ui/tests/App.test.tsx`
 - `.github/workflows/ci.yml`
 - `docker-compose.yml`
 - `.gitignore`
@@ -138,6 +145,11 @@ Acceptance:
 - import jobs and review receipts have explicit durable states
 - one canonical model exists for people, relations, sources, external identities, and
   review snapshots
+- schema includes the minimum version 1 tables:
+  `app_users`, `app_sessions`, `wikitree_connections`, `import_jobs`,
+  `import_job_stages`, `people`, `person_names`, `person_facts`, `relationships`,
+  `sources`, `external_identities`, `match_reviews`, `evidence_packets`,
+  and `sync_review_items`
 
 ### PR3: Backend Session Boundary
 
@@ -149,10 +161,10 @@ Files:
 - `apps/api/session_store.py`
 - `apps/api/routes_auth.py`
 - `apps/api/app.py`
-- `apps/web/src/routes/LoginPage.tsx`
-- `apps/web/src/lib/session.ts`
+- `apps/ui/src/routes/LoginPage.tsx`
+- `apps/ui/src/lib/session.ts`
 - `apps/api/tests/test_google_auth.py`
-- `apps/web/tests/routes/LoginPage.test.tsx`
+- `apps/ui/tests/routes/LoginPage.test.tsx`
 
 Why this is reviewable:
 - One concern only, app identity
@@ -178,8 +190,8 @@ Files:
 - `apps/api/models.py`
 - `apps/api/tests/test_wikitree_auth.py`
 - `apps/api/tests/test_wikitree_private_access.py`
-- `apps/web/src/routes/WikiTreeSettingsPage.tsx`
-- `apps/web/tests/routes/WikiTreeSettingsPage.test.tsx`
+- `apps/ui/src/routes/WikiTreeSettingsPage.tsx`
+- `apps/ui/tests/routes/WikiTreeSettingsPage.test.tsx`
 
 Why this is reviewable:
 - One external integration
@@ -206,8 +218,8 @@ Files:
 - `apps/api/models.py`
 - `apps/api/tests/test_import_pipeline.py`
 - `apps/api/tests/test_import_resume.py`
-- `apps/web/src/routes/ImportJobPage.tsx`
-- `apps/web/tests/routes/ImportJobPage.test.tsx`
+- `apps/ui/src/routes/ImportJobPage.tsx`
+- `apps/ui/tests/routes/ImportJobPage.test.tsx`
 
 Why this is reviewable:
 - Focuses on job lifecycle only
@@ -261,8 +273,8 @@ Files:
 - `apps/api/models.py`
 - `apps/api/tests/test_matching_pipeline.py`
 - `apps/api/tests/test_match_rules.py`
-- `apps/web/src/routes/AnchorMatchPage.tsx`
-- `apps/web/tests/routes/AnchorMatchPage.test.tsx`
+- `apps/ui/src/routes/AnchorMatchPage.tsx`
+- `apps/ui/tests/routes/AnchorMatchPage.test.tsx`
 
 Why this is reviewable:
 - First product logic PR
@@ -288,8 +300,8 @@ Files:
 - `apps/api/models.py`
 - `apps/api/tests/test_review_records.py`
 - `apps/api/tests/test_evidence_packets.py`
-- `apps/web/src/routes/ReviewQueuePage.tsx`
-- `apps/web/tests/routes/ReviewQueuePage.test.tsx`
+- `apps/ui/src/routes/ReviewQueuePage.tsx`
+- `apps/ui/tests/routes/ReviewQueuePage.test.tsx`
 
 Why this is reviewable:
 - No new traversal rules
@@ -316,7 +328,7 @@ Files:
 - `apps/api/tests/test_traversal.py`
 - `apps/api/tests/test_auto_accept.py`
 - `apps/api/tests/test_conflict_fallback.py`
-- `apps/web/src/routes/ReviewQueuePage.tsx`
+- `apps/ui/src/routes/ReviewQueuePage.tsx`
 
 Why this is reviewable:
 - One behavioral expansion on top of existing review flow
@@ -340,8 +352,8 @@ Files:
 - `apps/api/models.py`
 - `apps/api/tests/test_sync_review.py`
 - `apps/api/tests/test_additive_vs_conflicting.py`
-- `apps/web/src/routes/SyncReviewPage.tsx`
-- `apps/web/tests/routes/SyncReviewPage.test.tsx`
+- `apps/ui/src/routes/SyncReviewPage.tsx`
+- `apps/ui/tests/routes/SyncReviewPage.test.tsx`
 
 Why this is reviewable:
 - Cleanly separate from import and matching
@@ -387,7 +399,7 @@ Acceptance:
 Coverage target:
 
 - backend: `pytest --cov=apps/api --cov-fail-under=80`
-- frontend: `vitest --coverage --threshold.lines=80` from `apps/web`
+- frontend: `vitest --coverage --threshold.lines=80` from `apps/ui`
 - E2E: Playwright for critical user journeys, not for every edge case
 
 Quality bar:
@@ -409,7 +421,7 @@ Default locations:
 
 - backend tests: `apps/api/tests/`
 - backend fixtures: `apps/api/tests/fixtures/`
-- frontend tests: `apps/web/tests/`
+- frontend tests: `apps/ui/tests/`
 - e2e tests: `e2e/`
 
 ## Failure Modes To Design For
@@ -464,7 +476,7 @@ Execution notes:
 Conflict flags:
 
 - PR5, PR6, PR7, PR8, PR10 all touch `apps/api/models.py`, so sequence them.
-- PR7, PR8, PR9 all touch the review UI route area under `apps/web/src/routes/`, so
+- PR7, PR8, PR9 all touch the review UI route area under `apps/ui/src/routes/`, so
   keep them in one lane.
 - CI updates should be folded into the same PR only when they directly support the new
   behavior under test.
