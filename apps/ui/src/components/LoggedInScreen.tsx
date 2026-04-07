@@ -59,18 +59,41 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
             <div className="panel-card hero-card">
               <h3>Entry menu</h3>
               <div className="action-stack action-stack-roomy">
-                <button className="button-primary" type="button">
+                <button
+                  className="button-primary"
+                  type="button"
+                  disabled
+                  title="Coming soon: GEDCOM import is not available yet."
+                >
                   Import GEDCOM
                 </button>
-                <button className="button-secondary" type="button">
+                <button
+                  className="button-secondary"
+                  type="button"
+                  disabled
+                  title="Coming soon: WikiTree reconnect is not available yet."
+                >
                   Reconnect WikiTree
                 </button>
-                <button className="button-secondary" type="button">
+                <button
+                  className="button-secondary"
+                  type="button"
+                  disabled
+                  title="Coming soon: resume import is not available yet."
+                >
                   Resume previous import
                 </button>
-                <button className="button-secondary button-danger" type="button">
+                <button
+                  className="button-secondary button-danger"
+                  type="button"
+                  disabled
+                  title="Coming soon: clearing existing data is not available yet."
+                >
                   Clear existing data
                 </button>
+                <p className="section-eyebrow" aria-live="polite">
+                  These actions are coming soon and are temporarily unavailable.
+                </p>
               </div>
             </div>
 
