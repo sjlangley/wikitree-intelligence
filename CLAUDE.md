@@ -498,18 +498,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class PersonCreate(BaseModel):
     """Request model for creating a person."""
-    
+
     model_config = ConfigDict(extra='forbid')
-    
+
     name: str = Field(..., min_length=1, max_length=200)
     birth_year: int | None = Field(None, ge=1000, le=9999)
     wikitree_id: str | None = None
 
 class PersonResponse(BaseModel):
     """Response model for person data."""
-    
+
     model_config = ConfigDict(extra='forbid')
-    
+
     id: str
     name: str
     birth_year: int | None
@@ -588,13 +588,13 @@ from fastapi import HTTPException, status
 async def get_person(person_id: str) -> PersonResponse:
     """Get person by ID."""
     person = await person_service.get(person_id)
-    
+
     if not person:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f'Person {person_id} not found'
         )
-    
+
     return PersonResponse.model_validate(person)
 ```
 
@@ -615,9 +615,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application settings from environment."""
-    
+
     model_config = SettingsConfigDict(env_file='.env')
-    
+
     log_level: str = Field(default='INFO', alias='LOG_LEVEL')
     database_url: str = Field(..., alias='DATABASE_URL')
     auth_disabled: bool = Field(default=False, alias='AUTH_DISABLED')
@@ -656,10 +656,10 @@ async def test_get_person_success(async_test_client: AsyncClient):
     """Test successful person retrieval."""
     # Arrange
     person_id = 'test-123'
-    
+
     # Act
     response = await async_test_client.get(f'/person/{person_id}')
-    
+
     # Assert
     assert response.status_code == 200
     data = response.json()
@@ -670,7 +670,7 @@ async def test_get_person_success(async_test_client: AsyncClient):
 async def test_get_person_not_found(async_test_client: AsyncClient):
     """Test person not found error."""
     response = await async_test_client.get('/person/nonexistent')
-    
+
     assert response.status_code == 404
     assert 'not found' in response.json()['detail'].lower()
 ```
@@ -797,13 +797,13 @@ async def create_person(
 async def get_person(person_id: str) -> PersonResponse:
     """Get person by ID."""
     person = await person_service.get(person_id)
-    
+
     if not person:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f'Person {person_id} not found'
         )
-    
+
     return PersonResponse.model_validate(person)
 ```
 
@@ -815,13 +815,13 @@ from api.models.person import Person
 
 class PersonService:
     """Business logic for person operations."""
-    
+
     async def get(self, person_id: str) -> Person | None:
         """Get person by ID."""
         # Database or API call
         result = await db.get_person(person_id)
         return Person.model_validate(result) if result else None
-    
+
     async def create(
         self,
         data: PersonCreate,
@@ -831,7 +831,7 @@ class PersonService:
         person_dict = data.model_dump()
         person_dict['user_id'] = user_id
         person_dict['created_at'] = datetime.utcnow().isoformat()
-        
+
         result = await db.insert_person(person_dict)
         return Person.model_validate(result)
 ```
@@ -847,9 +847,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info('Starting up...')
     await database.connect()
-    
+
     yield
-    
+
     # Shutdown
     logger.info('Shutting down...')
     await database.disconnect()
