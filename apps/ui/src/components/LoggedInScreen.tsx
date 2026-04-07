@@ -48,7 +48,7 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
               begin another pass.
             </p>
           </div>
-          <div className="status-row" aria-label="Session status">
+          <div className="status-row" role="group" aria-label="Session status">
             <span className="status-pill status-pill-confirmed">Google session active</span>
             <span className="status-pill status-pill-review">WikiTree not connected yet</span>
           </div>
