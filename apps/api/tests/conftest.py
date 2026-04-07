@@ -21,7 +21,7 @@ def test_user():
 
 
 @pytest_asyncio.fixture()
-async def async_test_client() -> AsyncClient:
+async def async_test_client():
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url='http://test'
