@@ -257,7 +257,9 @@ Suggested version 1 stack shape:
 - monorepo layout with runnable apps under `apps/`
 - `frontend`: React + TypeScript
 - `api`: Python service
+- `worker`: Python background process that pulls queued jobs from PostgreSQL
 - `db`: PostgreSQL
+- `gedcom_data`: shared Docker volume for raw uploaded GEDCOM files
 - `auth`: Google sign-in for app identity
 - `compose`: local orchestration for repeatable setup and future cloud portability
 
@@ -282,6 +284,113 @@ associate:
 - WikiTree authenticated session state
 - preferences and future source connections
 
+## Execution Model
+
+Large GEDCOM imports should not run inline in the request/response cycle.
+
+Version 1 should use a simple execution architecture:
+
+- the API accepts uploads, creates job rows, and exposes status to the UI
+- the API streams the raw GEDCOM file into a shared mounted data volume
+- a separate worker process pulls queued jobs from PostgreSQL
+- the worker opens the GEDCOM from the shared mounted path instead of reading it from
+  PostgreSQL
+- the worker processes import and search work in small batches
+- the worker writes checkpoints, counts, and failures back to PostgreSQL after each
+  batch
+
+This gives the product the operational behavior it needs without introducing a separate
+message broker in version 1.
+
+The important distinction is:
+
+- execution queue:
+  background system work like parsing GEDCOM records, searching WikiTree, and updating
+  cached outcomes
+- review queues:
+  human work like checking possible matches, handling missing profiles, or reviewing
+  extra GEDCOM-only facts
+
+The execution queue should be PostgreSQL-backed and leased by the worker so pause,
+resume, retry, and crash recovery are all grounded in the same durable store as the rest
+of the application state.
+
+Raw GEDCOM storage should be handled separately from relational state:
+
+- PostgreSQL stores job metadata, checkpoints, normalized rows, and review outcomes
+- a shared Docker volume stores the original uploaded GEDCOM file
+- both `api` and `worker` mount the same volume path, for example
+  `/data/imports/<job_id>/original.ged`
+
+This shared Docker volume is the local-development stand-in for object/blob storage in a
+future hosted deployment. Later, the same logical design can swap the shared filesystem
+path for an object-storage reference in S3, R2, or GCS without changing the worker
+ownership model.
+
+Basic Python worker sketch:
+
+```python
+import asyncio
+import logging
+from uuid import uuid4
+
+from api.db import session_scope
+from api.import_jobs import claim_next_job, heartbeat_lease, mark_job_failed
+from api.import_pipeline import run_stage_batch
+
+LOGGER = logging.getLogger(__name__)
+WORKER_ID = f"worker-{uuid4()}"
+POLL_SECONDS = 2
+
+
+async def run_worker() -> None:
+    while True:
+        try:
+            with session_scope() as db:
+                job = claim_next_job(db, worker_id=WORKER_ID)
+
+            if job is None:
+                await asyncio.sleep(POLL_SECONDS)
+                continue
+
+            await process_job(job.id)
+        except Exception:
+            LOGGER.exception("worker loop crashed")
+            await asyncio.sleep(POLL_SECONDS)
+
+
+async def process_job(job_id: str) -> None:
+    while True:
+        with session_scope() as db:
+            heartbeat_lease(db, job_id=job_id, worker_id=WORKER_ID)
+            batch_result = run_stage_batch(db, job_id=job_id, worker_id=WORKER_ID)
+
+        if batch_result.state == "waiting":
+            await asyncio.sleep(POLL_SECONDS)
+            continue
+
+        if batch_result.state == "failed":
+            with session_scope() as db:
+                mark_job_failed(db, job_id=job_id, error=batch_result.error)
+            return
+
+        if batch_result.state == "completed":
+            return
+
+        await asyncio.sleep(0)
+```
+
+The important implementation detail is that `run_stage_batch(...)` should process only a
+small unit of work before committing:
+
+- parse the next GEDCOM chunk
+- normalize the next batch of people
+- search WikiTree for the next batch of unresolved people
+- promote only the next set of reviewable queue items
+
+Each batch should update durable checkpoint state before returning so the worker can
+resume after process restarts without redoing the whole import.
+
 ## Initial Schema Proposal
 
 Keep one canonical relational model in PostgreSQL.
@@ -295,9 +404,11 @@ Core tables:
 - `wikitree_connections`
   Per-user WikiTree connection state, session metadata, and visibility scope.
 - `import_jobs`
-  One row per GEDCOM import, including top-level status and current stage.
+  One row per GEDCOM import, including top-level status, current stage, and worker-owned
+  execution metadata.
 - `import_job_stages`
-  Stage-by-stage checkpoints, retry state, errors, and progress metadata.
+  Stage-by-stage checkpoints, retry state, lease information, errors, and progress
+  metadata.
 - `people`
   Canonical local person records used by matching, traversal, and sync review.
 - `person_names`
@@ -312,6 +423,11 @@ Core tables:
 - `external_identities`
   Links from a canonical local person to external systems like GEDCOM records or WikiTree
   profiles.
+- `wikitree_search_runs`
+  Cached per-person WikiTree search attempts, query plans, and top-level outcomes.
+- `wikitree_search_candidates`
+  Ranked candidate summaries returned from a search run, kept separate from confirmed
+  identities.
 - `match_reviews`
   Snapshot-backed review receipts for candidate matching decisions.
 - `evidence_packets`
@@ -351,8 +467,14 @@ import_jobs
   user_id -> app_users.id
   source_type
   original_filename
+  stored_path
+  file_size_bytes
+  content_sha256
   status
   current_stage
+  claimed_by
+  claimed_at
+  upload_completed_at
   created_at
   started_at
   completed_at
@@ -363,6 +485,7 @@ import_job_stages
   stage_name
   status
   checkpoint_json
+  lease_expires_at
   error_message
   started_at
   completed_at
@@ -418,6 +541,29 @@ external_identities
   imported_at
   last_seen_at
 
+wikitree_search_runs
+  id
+  import_job_id -> import_jobs.id
+  user_id -> app_users.id
+  subject_person_id -> people.id
+  status
+  outcome
+  query_plan_json
+  api_status_json
+  searched_at
+  expires_at
+
+wikitree_search_candidates
+  id
+  search_run_id -> wikitree_search_runs.id
+  matched_person_id -> people.id nullable
+  rank
+  wikitree_key
+  score
+  classification
+  summary_json
+  created_at
+
 match_reviews
   id
   import_job_id -> import_jobs.id
@@ -454,6 +600,14 @@ Modeling rules:
 - use `people` as the canonical local node for all downstream workflows
 - use `external_identities` to attach GEDCOM records and WikiTree profiles to canonical
   people
+- use `wikitree_search_runs` and `wikitree_search_candidates` to cache unconfirmed API
+  search results per person without polluting canonical identity tables
+- only write WikiTree identities into `external_identities` after a human-confirmed or
+  explicitly derived match
+- use PostgreSQL-backed job leasing so one worker can safely claim a batch while another
+  can recover abandoned work after a crash
+- keep raw GEDCOM files out of PostgreSQL; store them in the shared mounted volume and
+  keep only file metadata and location references in relational tables
 - use `relationships` as the graph edge table instead of introducing a separate graph
   database
 - use recursive SQL over `relationships` for outward traversal
@@ -500,8 +654,10 @@ it is.
 Version 1 should maintain local state for:
 
 - Confirmed GEDCOM person to WikiTree profile matches
+- The latest cached WikiTree search result for each searched person
 - Rejected candidate matches
 - Deferred or uncertain matches that need another look
+- People searched with no safe match found
 - The reasons and evidence used for each decision
 - Import job progress and reconciliation checkpoints
 
@@ -530,8 +686,11 @@ fact.
 The persistence model should be backed by the main application database so that:
 
 - confirmed matches can be reused across sessions
+- repeated WikiTree API calls can be reduced by reusing recent search runs and candidate
+  summaries
 - derived matches can be traced back to the prior confirmations that implied them
 - rejected candidates are not resurfaced endlessly
+- searched-but-missing people are remembered instead of being rediscovered every run
 - evidence packets remain attached to the decisions they justified
 
 Private-data-derived facts should also record that they came from authenticated WikiTree
@@ -564,6 +723,32 @@ The review queue should prioritize what is actually interesting:
 It should de-prioritize already-resolved confident matches except as supporting context
 for continued outward traversal.
 
+## Work Queues
+
+Version 1 should present work as explicit queues, not as one giant undifferentiated list.
+
+The primary queues are:
+
+- Needs review:
+  at least one plausible WikiTree candidate exists and a human should inspect it
+- Missing from WikiTree:
+  the latest search run found no safe candidate and the person may need to be created
+- Resolved:
+  a confirmed or derived match already exists and can be reused for traversal
+- Matched, extra data:
+  the person is already matched but GEDCOM has useful facts or sources not yet reflected
+  in WikiTree
+
+The system should not promote every searched person into an active queue item at once.
+Large GEDCOM imports may produce thousands of unresolved people. Promotion should favor:
+
+- the anchored branch the user is actively exploring
+- close relatives of already-confirmed matches
+- nodes with strong evidence or high duplicate-avoidance value
+
+All other searched people can remain in cached search state until the user expands into
+that part of the tree.
+
 ## Later Sync Review
 
 Import and identity matching should stay separate from profile enrichment.
@@ -583,6 +768,24 @@ This later sync-review list should show:
 
 This keeps import focused on identity resolution while still creating a path for useful
 data improvement work after the tree is mapped.
+
+## Missing Profile Handoff
+
+Because the WikiTree API is read-only, version 1 should not attempt to create profiles
+automatically.
+
+For people whose latest search run ends in `no_safe_match`, the app should prepare a
+manual creation handoff that includes:
+
+- the GEDCOM person summary
+- close relatives already matched in WikiTree
+- facts and sources that support profile creation
+- warnings about duplicate risk and uncertain facts
+- a place to record the newly created WikiTree ID after the user adds the profile on
+  WikiTree
+
+This makes "missing from WikiTree" actionable without pretending the app can safely
+write to WikiTree on the user's behalf.
 
 ## Authentication Boundary
 

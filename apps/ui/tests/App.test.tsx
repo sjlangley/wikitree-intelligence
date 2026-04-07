@@ -54,8 +54,11 @@ describe('App', () => {
     });
     expect(heading).toBeDefined();
 
-    const subtitle = screen.getByText(/local-first genealogy workbench/i);
+    const subtitle = screen.getByText(/local-first genealogy software/i);
     expect(subtitle).toBeDefined();
+
+    expect(screen.getByText(/research-grade genealogy/i)).toBeDefined();
+    expect(screen.getByText(/one workspace for the real decisions/i)).toBeDefined();
 
     const signInButton = screen.getByTestId('google-signin-button');
     expect(signInButton).toBeDefined();
@@ -78,22 +81,17 @@ describe('App', () => {
 
     render(<App />);
 
-    const heading = screen.getByRole('heading', {
-      name: /wikitree intelligence/i,
-    });
-    expect(heading).toBeDefined();
-
     const loggedInHeading = screen.getByRole('heading', {
-      name: /you are logged in/i,
+      name: /genealogy detective desk/i,
     });
     expect(loggedInHeading).toBeDefined();
 
-    // Check user details are displayed
     expect(screen.getByText(/test-user-123/i)).toBeDefined();
     expect(screen.getByText(/test@example.com/i)).toBeDefined();
-    expect(screen.getByText(/Test User/i)).toBeDefined();
+    expect(screen.getAllByText(/Test User/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/import gedcom/i)).toBeDefined();
+    expect(screen.getByText(/clear existing data/i)).toBeDefined();
 
-    // Check logout button is present
     const logoutButton = screen.getByRole('button', { name: /logout/i });
     expect(logoutButton).toBeDefined();
   });

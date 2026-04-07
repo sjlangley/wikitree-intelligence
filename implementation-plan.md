@@ -15,6 +15,29 @@ Ship version 1 of the WikiTree Match Workbench as a local-first web app that:
 - lets the user anchor one known person, traverse outward, review matches, and queue
   later sync-review items
 
+## Current Implementation Status
+
+The repo has already shipped the Google auth/session boundary ahead of the rest of the
+planned roadmap.
+
+Implemented today:
+
+- FastAPI app wiring with `SessionMiddleware`
+- `POST /auth/login` to verify the Google token and create the app session
+- `POST /auth/logout` to clear the app session
+- `GET /user/current` to restore the signed-in user from session state
+- React `AuthProvider` that loads auth state on startup and exposes login/logout actions
+- UI states for loading, unauthenticated, and authenticated sessions
+- backend and frontend tests covering the auth/session flow
+
+Planning note:
+
+- the current implementation landed out of original PR order
+- the auth/session boundary is effectively complete even though the database spine and
+  later roadmap items are still pending
+- future PRs should build on the existing auth/session code rather than re-introducing a
+  different login boundary
+
 ## Delivery Guardrails
 
 - Every PR must touch fewer than 10 files.
@@ -28,8 +51,10 @@ Ship version 1 of the WikiTree Match Workbench as a local-first web app that:
 ## Planned Stack
 
 - Backend: Python
+- Worker: Python background process pulling import work from PostgreSQL
 - Frontend: React + TypeScript
 - Database: PostgreSQL as the only source of truth
+- Raw GEDCOM storage: shared Docker volume in local development, object storage later
 - Local orchestration: Docker Compose
 - Backend tests: `pytest`
 - Frontend tests: `vitest`
@@ -64,9 +89,8 @@ Use `apps/` as the monorepo home for runnable applications. In version 1 that me
 - `apps/api/`
 - `apps/ui/`
 
-Do not introduce extra packages, workers, or shared libraries in v1 unless a later PR
-proves the duplication is real. Shared code should live inside one app until duplication
-is real enough to justify extraction.
+Use a separate worker process in v1, but keep the implementation inside `apps/api`
+until duplication is real enough to justify extraction.
 
 ## Architecture Spine
 
@@ -77,12 +101,27 @@ is real enough to justify extraction.
 [api]
    |-- Google app session
    |-- WikiTree connection/session
-   |-- import jobs
-   |-- matching pipeline
    |-- review queue
+   |-- enqueue import/search work
+   |
+   +------> [worker]
+              |-- claim queued jobs
+              |-- run staged import/search batches
+              |-- write checkpoints and outcomes
    v
 [postgres]
 ```
+
+Execution model:
+
+- the API accepts uploads and creates durable job rows in PostgreSQL
+- the API stores the raw GEDCOM in a shared mounted volume and records its path/metadata
+- the worker pulls queued work from PostgreSQL rather than receiving pushes from an
+  external queue
+- the worker reads the GEDCOM from the shared mounted path
+- the worker processes GEDCOM imports and WikiTree search in small batches so progress,
+  retry, and pause/resume remain cheap
+- the UI reads job status, counts, and queue summaries from the API
 
 ## PR Plan
 
@@ -113,7 +152,8 @@ Tests:
 - CI runs `pytest`, `vitest`, and coverage thresholds
 
 Acceptance:
-- `docker compose up` boots app and db
+- `docker compose up` boots ui, api, worker, and db
+- api and worker share a mounted data volume for uploaded GEDCOM files
 - CI passes
 - backend and frontend coverage gates are both set to 80%
 
@@ -148,23 +188,33 @@ Acceptance:
 - schema includes the minimum version 1 tables:
   `app_users`, `app_sessions`, `wikitree_connections`, `import_jobs`,
   `import_job_stages`, `people`, `person_names`, `person_facts`, `relationships`,
-  `sources`, `external_identities`, `match_reviews`, `evidence_packets`,
-  and `sync_review_items`
+  `sources`, `external_identities`, `wikitree_search_runs`,
+  `wikitree_search_candidates`, `match_reviews`, `evidence_packets`, and
+  `sync_review_items`
 
 ### PR3: Backend Session Boundary
 
 Purpose:
 Implement backend-owned Google app auth and durable app sessions.
 
+Status:
+Implemented in simplified form in the current repo.
+
 Files:
-- `apps/api/auth_google.py`
-- `apps/api/session_store.py`
-- `apps/api/routes_auth.py`
-- `apps/api/app.py`
-- `apps/ui/src/routes/LoginPage.tsx`
-- `apps/ui/src/lib/session.ts`
-- `apps/api/tests/test_google_auth.py`
-- `apps/ui/tests/routes/LoginPage.test.tsx`
+- `apps/api/src/api/routes/auth.py`
+- `apps/api/src/api/routes/user.py`
+- `apps/api/src/api/security/google_bearer_token.py`
+- `apps/api/src/api/security/session_auth.py`
+- `apps/api/src/api/app.py`
+- `apps/ui/src/lib/auth.tsx`
+- `apps/ui/src/components/GoogleSignInButton.tsx`
+- `apps/ui/src/components/LoggedInScreen.tsx`
+- `apps/api/tests/routers/test_auth.py`
+- `apps/api/tests/routers/test_user.py`
+- `apps/api/tests/test_google_bearer_token.py`
+- `apps/ui/tests/auth.test.tsx`
+- `apps/ui/tests/GoogleSignInButton.test.tsx`
+- `apps/ui/tests/LoggedInScreen.test.tsx`
 
 Why this is reviewable:
 - One concern only, app identity
@@ -177,6 +227,8 @@ Tests:
 
 Acceptance:
 - SPA relies on backend session, not browser-stored identity tricks
+- complete in current repo, using signed session cookies rather than a database-backed
+  session store
 
 ### PR4: WikiTree Connection Boundary
 
@@ -209,13 +261,15 @@ Acceptance:
 ### PR5: Import Job API + Staged Pipeline Shell
 
 Purpose:
-Create resumable staged import jobs without full GEDCOM parsing yet.
+Create resumable staged import jobs and a worker-owned execution loop without full
+GEDCOM parsing yet.
 
 Files:
-- `apps/api/import_jobs.py`
-- `apps/api/import_pipeline.py`
-- `apps/api/routes_imports.py`
-- `apps/api/models.py`
+- `apps/api/src/api/import_jobs.py`
+- `apps/api/src/api/import_pipeline.py`
+- `apps/api/src/api/worker.py`
+- `apps/api/src/api/routes_imports.py`
+- `apps/api/src/api/models.py`
 - `apps/api/tests/test_import_pipeline.py`
 - `apps/api/tests/test_import_resume.py`
 - `apps/ui/src/routes/ImportJobPage.tsx`
@@ -228,10 +282,39 @@ Why this is reviewable:
 Tests:
 - stage transitions
 - pause/resume
+- worker claims one queued job safely
 - failed stage becomes visible recoverable state
 
 Acceptance:
 - import jobs are checkpointed and resumable even before real GEDCOM parsing lands
+- API enqueues work and the worker advances the job without blocking user requests
+- raw GEDCOM uploads are persisted in shared volume storage and referenced from the job
+  record
+
+Implementation sketch:
+
+```python
+async def run_worker() -> None:
+    while True:
+        job = claim_next_job(worker_id=WORKER_ID)
+        if job is None:
+            await asyncio.sleep(POLL_SECONDS)
+            continue
+
+        while True:
+            heartbeat_lease(job.id, worker_id=WORKER_ID)
+            result = run_stage_batch(job.id, worker_id=WORKER_ID)
+
+            if result.state in {"completed", "failed"}:
+                break
+```
+
+The first cut should keep this boring:
+
+- `claim_next_job(...)` uses PostgreSQL leasing so only one worker owns a job at a time
+- `run_stage_batch(...)` handles one bounded chunk of work and commits a checkpoint
+- the API never performs long import/search work inline; it only enqueues and reports
+  status
 
 ### PR6: GEDCOM Parse + Normalize
 
@@ -259,6 +342,7 @@ Tests:
 
 Acceptance:
 - import pipeline persists normalized canonical rows
+- worker can persist partial batch progress during large imports
 - failure states are explicit and recoverable
 
 ### PR7: Anchor Flow + Matching Pipeline
@@ -269,10 +353,12 @@ Implement the first real “whoa” path, anchor one person and generate candida
 Files:
 - `apps/api/matching_pipeline.py`
 - `apps/api/match_rules.py`
+- `apps/api/wikitree_search_cache.py`
 - `apps/api/routes_matches.py`
 - `apps/api/models.py`
 - `apps/api/tests/test_matching_pipeline.py`
 - `apps/api/tests/test_match_rules.py`
+- `apps/api/tests/test_wikitree_search_cache.py`
 - `apps/ui/src/routes/AnchorMatchPage.tsx`
 - `apps/ui/tests/routes/AnchorMatchPage.test.tsx`
 
@@ -283,10 +369,15 @@ Why this is reviewable:
 Tests:
 - anchor selection
 - likely / maybe / no-safe-match classification
+- top candidate summaries are cached per searched person
 - ambiguous relative goes to manual review
 
 Acceptance:
 - one anchored person can generate a reviewable candidate queue
+- search results are cached without creating fake canonical WikiTree people for
+  unconfirmed candidates
+- a searched person can end the run as `needs_review` or `no_safe_match`
+- matching/search work can be resumed by the worker from the last durable checkpoint
 
 ### PR8: Review Receipts + Evidence Packets
 
@@ -314,6 +405,8 @@ Tests:
 
 Acceptance:
 - review queue is durable and auditable
+- UI clearly separates `needs review`, `missing from WikiTree`, and `resolved`
+  outcomes
 
 ### PR9: Traversal Through Resolved Matches + Auto-Accept Rules
 
@@ -366,6 +459,8 @@ Tests:
 
 Acceptance:
 - later sync-review queue exists and stays separate from import
+- later sync-review is distinct from the `missing from WikiTree` queue and from
+  unresolved candidate review
 
 ### PR11: End-to-End Hardening
 
@@ -389,6 +484,7 @@ Tests:
 - WikiTree connect -> private data visible
 - start/pause/resume import
 - anchor -> candidate review -> traversal continuation
+- no-safe-match person appears in the missing queue with manual handoff details
 - later sync-review queue appears
 
 Acceptance:
@@ -415,6 +511,7 @@ Use layered fixtures:
 - tiny synthetic GEDCOM fixtures for unit tests
 - one redacted messy GEDCOM fixture for integration truth
 - mock WikiTree responses for most tests
+- mock both candidate-hit and no-safe-match WikiTree search shapes
 - one narrow end-to-end “realistic response shape” fixture for browser flows
 
 Default locations:

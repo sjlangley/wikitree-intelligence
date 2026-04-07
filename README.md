@@ -17,11 +17,12 @@ This repo is in active development.
 
 ### Completed
 
-✅ **Google Authentication** - Users can sign in with Google OAuth
-- Frontend: React authentication flow with AuthProvider
-- Backend: FastAPI with session-based authentication
-- Session cookies for secure API access
-- Full test coverage (UI: 20 tests, API: 16 tests with 93.66% coverage)
+✅ **Google Authentication And App Session Boundary**
+- Frontend: React `AuthProvider` restores auth state on app load
+- Backend: FastAPI login/logout/current-user endpoints are live
+- Session cookies: Starlette `SessionMiddleware` persists app session state
+- User flow: Google sign-in, returning-session restore, and logout all work
+- Coverage: UI 20 tests, API 16 tests with 93.66% backend coverage
 
 ### In Progress
 
@@ -36,11 +37,13 @@ Planning and architecture documentation:
 ## Planned Stack
 
 - `apps/api/` — Python backend
+- planned background worker component for staged import/search jobs
 - `apps/ui/` — React + TypeScript frontend
 - `apps/api/tests/` — backend tests
 - `apps/ui/tests/` — frontend tests
 - `e2e/` — Playwright end-to-end tests
 - `migrations/` — database migrations
+- shared Docker volume — raw uploaded GEDCOM storage in local development
 - `docker-compose.yml` — local orchestration
 
 ## Version 1 Goals
@@ -48,6 +51,7 @@ Planning and architecture documentation:
 - Google-authenticated app session
 - WikiTree-authenticated private-data reads through the backend
 - staged, resumable GEDCOM imports
+- background worker execution for large import/search jobs
 - one canonical person/relationship model
 - snapshot-backed review receipts and evidence packets
 - outward traversal through resolved matches
@@ -125,4 +129,6 @@ npm run test:ci  # with coverage
 
 ## Next Step
 
-Start with `PR1` from [`implementation-plan.md`](./implementation-plan.md).
+Continue with the next unfinished boundary from
+[`implementation-plan.md`](./implementation-plan.md): WikiTree connection, import job
+storage/worker execution, and the canonical data model.
