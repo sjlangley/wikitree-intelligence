@@ -33,12 +33,28 @@ class Settings(BaseSettings):
         alias='GOOGLE_OAUTH_CLIENT_ID',
     )
 
-    # For CORS Policy used in CORS middleware.
+    allowed_hosted_domains: list[str] = Field(
+        default_factory=list,
+        description=(
+            'List of allowed hosted domains (hd claim) for Google accounts. '
+            'If empty, accounts from any hosted domain are allowed.'
+        ),
+        alias='ALLOWED_HOSTED_DOMAINS',
+    )
 
     # FastAPI’s CORS middleware does NOT support wildcard subdomains.
     # Ensure to include all specific subdomains for the web application.
     client_origins: list[str] = Field(
         default_factory=list, alias='CLIENT_ORIGINS'
+    )
+
+    session_secret_key: str = Field(
+        ...,
+        description=(
+            'Secret key for signing session cookies. Must be set to a secure, '
+            'random value in production.'
+        ),
+        alias='SESSION_SECRET_KEY',
     )
 
 

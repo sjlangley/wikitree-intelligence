@@ -8,4 +8,5 @@ class Environment(StrEnum):
 
     PRODUCTION = 'production'
     STAGING = 'staging'
+    DEVELOPMENT = 'development'
     LOCAL = 'local'
