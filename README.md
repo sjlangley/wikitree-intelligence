@@ -37,7 +37,7 @@ Planning and architecture documentation:
 ## Planned Stack
 
 - `apps/api/` — Python backend
-- `apps/api/worker.py` — background worker for staged import/search jobs
+- planned background worker component for staged import/search jobs
 - `apps/ui/` — React + TypeScript frontend
 - `apps/api/tests/` — backend tests
 - `apps/ui/tests/` — frontend tests
