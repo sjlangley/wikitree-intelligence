@@ -6,10 +6,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../lib/auth';
 
+const GOOGLE_SDK_TIMEOUT_MS = 10000; // 10 seconds
+
 export function GoogleSignInButton() {
   const buttonRef = useRef<HTMLDivElement>(null);
   const { loginWithGoogle } = useAuth();
   const [isGoogleLoaded, setIsGoogleLoaded] = useState(() => !!window.google);
+  const [sdkLoadError, setSdkLoadError] = useState(false);
+  const initializationRef = useRef(false);
+  
+  // Read env var inside component for better testability
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  // Check for missing client ID upfront
+  if (!GOOGLE_CLIENT_ID) {
+    return (
+      <div className="google-signin-error">
+        Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file.
+      </div>
+    );
+  }
 
   // Wait for Google Identity Services script to load
   useEffect(() => {
@@ -17,11 +33,20 @@ export function GoogleSignInButton() {
       return;
     }
 
-    // Poll for Google script availability
+    let pollCount = 0;
+    const maxPolls = GOOGLE_SDK_TIMEOUT_MS / 100;
+
+    // Poll for Google script availability with timeout
     const checkGoogle = setInterval(() => {
       if (window.google) {
         setIsGoogleLoaded(true);
         clearInterval(checkGoogle);
+      } else {
+        pollCount++;
+        if (pollCount >= maxPolls) {
+          setSdkLoadError(true);
+          clearInterval(checkGoogle);
+        }
       }
     }, 100);
 
@@ -30,19 +55,20 @@ export function GoogleSignInButton() {
 
   // Initialize Google Sign-In button once script is loaded
   useEffect(() => {
-    const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-    if (!GOOGLE_CLIENT_ID) {
-      console.error(
-        'VITE_GOOGLE_CLIENT_ID environment variable is not set. ' +
-          'Please configure it in your .env file. ' +
-          'See .env.example for reference.'
-      );
+    if (!isGoogleLoaded || !window.google || !buttonRef.current) {
       return;
     }
 
-    if (!isGoogleLoaded || !window.google || !buttonRef.current) {
+    // Prevent double-initialization from React StrictMode
+    if (initializationRef.current) {
       return;
+    }
+
+    initializationRef.current = true;
+
+    // Clear any existing content to prevent duplicate rendering
+    if (buttonRef.current) {
+      buttonRef.current.innerHTML = '';
     }
 
     // Initialize Google Identity Services
@@ -58,23 +84,31 @@ export function GoogleSignInButton() {
     });
 
     // Render the sign-in button
-    window.google.accounts.id.renderButton(buttonRef.current, {
-      theme: 'outline',
-      size: 'large',
-      text: 'signin_with',
-    });
+    if (buttonRef.current) {
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+      });
+    }
+
+    // Reset initialization flag on cleanup
+    return () => {
+      initializationRef.current = false;
+    };
   }, [isGoogleLoaded, loginWithGoogle]);
+
+  if (sdkLoadError) {
+    return (
+      <div className="google-signin-error">
+        Failed to load Google Sign-In. Please check your internet connection and ensure
+        third-party scripts are not blocked.
+      </div>
+    );
+  }
 
   if (!isGoogleLoaded) {
     return <div className="google-signin-loading">Loading sign-in button...</div>;
-  }
-
-  if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-    return (
-      <div className="google-signin-error">
-        Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file.
-      </div>
-    );
   }
 
   return <div ref={buttonRef} data-testid="google-signin-button"></div>;

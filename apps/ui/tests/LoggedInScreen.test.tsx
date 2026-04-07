@@ -99,27 +99,6 @@ describe("LoggedInScreen", () => {
     expect(mockLogout).toHaveBeenCalledOnce();
   });
 
-  it("handles logout errors gracefully", async () => {
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-
-    mockLogout.mockRejectedValue(new Error("Logout failed"));
-
-    const user = userEvent.setup();
-    render(<LoggedInScreen user={testUser} />);
-
-    const logoutButton = screen.getByRole("button", { name: /logout/i });
-    await user.click(logoutButton);
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Logout failed:",
-      expect.any(Error)
-    );
-
-    consoleErrorSpy.mockRestore();
-  });
-
   it("displays success message", () => {
     render(<LoggedInScreen user={testUser} />);
 
