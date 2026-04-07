@@ -41,5 +41,14 @@ class Settings(BaseSettings):
         default_factory=list, alias='CLIENT_ORIGINS'
     )
 
+    session_secret_key: str = Field(
+        ...,
+        description=(
+            'Secret key for signing session cookies. Must be set to a secure, '
+            'random value in production.'
+        ),
+        alias='SESSION_SECRET_KEY',
+    )
+
 
 settings = Settings()  # pyrefly: ignore[missing-argument]

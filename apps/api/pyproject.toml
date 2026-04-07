@@ -16,6 +16,7 @@ dependencies = [
     "gunicorn==25.1.0",
     "pydantic==2.12.5",
     "pydantic-settings==2.13.1",
+    "itsdangerous==2.2.0",
     "uvicorn==0.41.0",
 ]
 authors = [
@@ -63,6 +64,8 @@ log_level = "INFO"
 
 [tool.pytest_env]
 GOOGLE_OAUTH_CLIENT_ID = 'not-a-real-client-id'
+SESSION_SECRET_KEY = 'not-a-real-secret-key'
+ENVIRONMENT = 'development'
 
 [tool.coverage.run]
 source = ["api"]
