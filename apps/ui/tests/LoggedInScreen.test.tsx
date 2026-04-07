@@ -37,7 +37,7 @@ describe('LoggedInScreen', () => {
     render(<LoggedInScreen user={testUser} />);
 
     const heading = screen.getByRole('heading', {
-      name: /wikitree intelligence/i,
+      name: /genealogy detective desk/i,
     });
     expect(heading).toBeDefined();
   });
@@ -51,7 +51,7 @@ describe('LoggedInScreen', () => {
   it('displays user name when provided', () => {
     render(<LoggedInScreen user={testUser} />);
 
-    expect(screen.getByText(/Test User/i)).toBeDefined();
+    expect(screen.getAllByText(/Test User/i).length).toBeGreaterThan(0);
   });
 
   it('displays user email when provided', () => {
@@ -102,13 +102,13 @@ describe('LoggedInScreen', () => {
   it('displays success message', () => {
     render(<LoggedInScreen user={testUser} />);
 
-    expect(screen.getByText(/Authentication is working end-to-end!/i)).toBeDefined();
+    expect(screen.getByText(/start with a gedcom, then work outward/i)).toBeDefined();
   });
 
   it('displays API endpoint reference', () => {
     render(<LoggedInScreen user={testUser} />);
 
-    expect(screen.getByText(/\/user\/current/i)).toBeDefined();
+    expect(screen.getByText(/clear existing data/i)).toBeDefined();
   });
 
   it('renders with minimal user data (only userid)', () => {
@@ -120,7 +120,7 @@ describe('LoggedInScreen', () => {
 
     render(<LoggedInScreen user={minimalUser} />);
 
-    expect(screen.getByText(/minimal-user/i)).toBeDefined();
+    expect(screen.getAllByText(/minimal-user/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Name:/)).toBeNull();
     expect(screen.queryByText(/Email:/)).toBeNull();
   });

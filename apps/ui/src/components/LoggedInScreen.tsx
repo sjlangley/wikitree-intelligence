@@ -17,40 +17,125 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
     await logout();
   }
 
+  // TODO: Replace this empty-state home screen with real import status and workspace
+  // routing once GEDCOM jobs and review queues exist.
   return (
-    <div className="logged-in-screen">
-      <h1>WikiTree Intelligence</h1>
+    <main className="workbench-shell">
+      <header className="app-topbar">
+        <div>
+          <p className="section-eyebrow">WikiTree Intelligence</p>
+          <h1 className="app-title">Genealogy detective desk</h1>
+        </div>
+        <div className="topbar-actions">
+          <div className="user-badge">
+            <span className="user-badge-label">Signed in</span>
+            <strong>{user.name || user.email || user.userid}</strong>
+          </div>
+          <button onClick={handleLogout} className="button-secondary" type="button">
+            Logout
+          </button>
+        </div>
+      </header>
 
-      <div className="user-info">
-        <h2>You are logged in</h2>
-
-        <div className="user-details">
-          <p>
-            <strong>User ID:</strong> {user.userid}
-          </p>
-          {user.name && (
+      <section className="workspace-card">
+        <div className="workspace-summary workspace-summary-empty">
+          <div>
+            <p className="section-eyebrow">No import in progress</p>
+            <h2>Start with a GEDCOM, then work outward.</h2>
             <p>
-              <strong>Name:</strong> {user.name}
+              This should be the first screen a signed-in researcher sees when there is no active
+              import. Start a new GEDCOM import, reconnect WikiTree, or clear local data before you
+              begin another pass.
             </p>
-          )}
-          {user.email && (
-            <p>
-              <strong>Email:</strong> {user.email}
-            </p>
-          )}
+          </div>
+          <div className="status-row" aria-label="Session status">
+            <span className="status-pill status-pill-confirmed">Google session active</span>
+            <span className="status-pill status-pill-review">WikiTree not connected yet</span>
+          </div>
         </div>
 
-        <button onClick={handleLogout} className="logout-button">
-          Logout
-        </button>
-      </div>
+        <div className="home-grid">
+          <section className="home-main">
+            <div className="panel-card hero-card">
+              <h3>Entry menu</h3>
+              <div className="action-stack action-stack-roomy">
+                <button className="button-primary" type="button">
+                  Import GEDCOM
+                </button>
+                <button className="button-secondary" type="button">
+                  Reconnect WikiTree
+                </button>
+                <button className="button-secondary" type="button">
+                  Resume previous import
+                </button>
+                <button className="button-secondary button-danger" type="button">
+                  Clear existing data
+                </button>
+              </div>
+            </div>
 
-      <div className="info-message">
-        <p>
-          Authentication is working end-to-end! The user information above was fetched from the{' '}
-          <code>/user/current</code> API endpoint.
-        </p>
-      </div>
-    </div>
+            <div className="panel-card">
+              <h3>What happens next</h3>
+              <div className="record-list">
+                <div className="record-row">
+                  <strong>1. Import one GEDCOM</strong>
+                  <span>
+                    Store the file locally, queue the job, and normalize people and relationships.
+                  </span>
+                </div>
+                <div className="record-row">
+                  <strong>2. Anchor one known person</strong>
+                  <span>
+                    Pick a person you trust and connect them to the right WikiTree profile.
+                  </span>
+                </div>
+                <div className="record-row">
+                  <strong>3. Review only the interesting cases</strong>
+                  <span>
+                    Possible matches, missing profiles, and conflicting facts rise to the top.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside className="home-sidebar">
+            <div className="panel-card panel-card-muted">
+              <h3>User session</h3>
+              <dl className="detail-list">
+                <div>
+                  <dt>User ID</dt>
+                  <dd>{user.userid}</dd>
+                </div>
+                {user.name && (
+                  <div>
+                    <dt>Name</dt>
+                    <dd>{user.name}</dd>
+                  </div>
+                )}
+                {user.email && (
+                  <div>
+                    <dt>Email</dt>
+                    <dd>{user.email}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            <div className="panel-card">
+              <h3>Before you start</h3>
+              <p>
+                WikiTree is read-only from the API side. This app should help you find safe existing
+                matches first, then hand off missing profiles or extra facts for deliberate review.
+              </p>
+              <p>
+                The home screen stays simple until an import exists. Then it should switch from
+                “menu” to “workspace”.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
   );
 }
