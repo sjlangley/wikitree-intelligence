@@ -265,11 +265,11 @@ Create resumable staged import jobs and a worker-owned execution loop without fu
 GEDCOM parsing yet.
 
 Files:
-- `apps/api/import_jobs.py`
-- `apps/api/import_pipeline.py`
-- `apps/api/worker.py`
-- `apps/api/routes_imports.py`
-- `apps/api/models.py`
+- `apps/api/src/api/import_jobs.py`
+- `apps/api/src/api/import_pipeline.py`
+- `apps/api/src/api/worker.py`
+- `apps/api/src/api/routes_imports.py`
+- `apps/api/src/api/models.py`
 - `apps/api/tests/test_import_pipeline.py`
 - `apps/api/tests/test_import_resume.py`
 - `apps/ui/src/routes/ImportJobPage.tsx`
