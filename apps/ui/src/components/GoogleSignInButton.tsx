@@ -18,15 +18,6 @@ export function GoogleSignInButton() {
   // Read env var inside component for better testability
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-  // Check for missing client ID upfront
-  if (!GOOGLE_CLIENT_ID) {
-    return (
-      <div className="google-signin-error">
-        Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file.
-      </div>
-    );
-  }
-
   // Wait for Google Identity Services script to load
   useEffect(() => {
     if (window.google) {
@@ -55,7 +46,7 @@ export function GoogleSignInButton() {
 
   // Initialize Google Sign-In button once script is loaded
   useEffect(() => {
-    if (!isGoogleLoaded || !window.google || !buttonRef.current) {
+    if (!isGoogleLoaded || !window.google || !buttonRef.current || !GOOGLE_CLIENT_ID) {
       return;
     }
 
@@ -96,7 +87,18 @@ export function GoogleSignInButton() {
     return () => {
       initializationRef.current = false;
     };
+    // GOOGLE_CLIENT_ID is from import.meta.env and never changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGoogleLoaded, loginWithGoogle]);
+
+  // Check for missing client ID - render error if not configured
+  if (!GOOGLE_CLIENT_ID) {
+    return (
+      <div className="google-signin-error">
+        Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file.
+      </div>
+    );
+  }
 
   if (sdkLoadError) {
     return (
