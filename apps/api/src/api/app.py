@@ -20,7 +20,7 @@ if settings.client_origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.client_origins,
-        allow_credentials=False,
+        allow_credentials=True,
         allow_methods=['GET', 'POST'],
         allow_headers=['Content-Type', 'Authorization'],
     )
