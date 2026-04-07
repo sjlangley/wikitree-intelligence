@@ -13,9 +13,19 @@ The core job is not bulk import. The core job is:
 
 ## Status
 
-This repo is in planning mode.
+This repo is in active development.
 
-Current source-of-truth docs:
+### Completed
+
+✅ **Google Authentication** - Users can sign in with Google OAuth
+- Frontend: React authentication flow with AuthProvider
+- Backend: FastAPI with session-based authentication
+- Session cookies for secure API access
+- Full test coverage (UI: 20 tests, API: 16 tests with 93.66% coverage)
+
+### In Progress
+
+Planning and architecture documentation:
 
 - [`office-hours-design.md`](./office-hours-design.md) — approved product/design doc
 - [`implementation-plan.md`](./implementation-plan.md) — PR-by-PR build plan
@@ -49,6 +59,69 @@ Current source-of-truth docs:
 - every PR must be easy to review
 - repo coverage target is at least 80%
 - critical flows get Playwright coverage
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.12+
+- Node.js 18+
+- Google OAuth credentials (get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials))
+
+### Backend Setup
+
+```bash
+cd apps/api
+
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -e ".[dev]"
+
+# Configure environment (copy .env.example to .env and fill in values)
+cp .env.example .env
+
+# Run development server
+uvicorn api.app:app --reload
+```
+
+Backend runs at `http://localhost:8000`  
+API docs at `http://localhost:8000/docs`
+
+### Frontend Setup
+
+```bash
+cd apps/ui
+
+# Install dependencies
+npm install
+
+# Configure environment (copy .env.example to .env and fill in values)
+cp .env.example .env
+
+# Run development server
+npm run dev
+```
+
+Frontend runs at `http://localhost:5173`
+
+### Running Tests
+
+**Backend:**
+```bash
+cd apps/api
+source .venv/bin/activate
+pytest -v
+```
+
+**Frontend:**
+```bash
+cd apps/ui
+npm run test
+npm run test:ci  # with coverage
+```
 
 ## Next Step
 
