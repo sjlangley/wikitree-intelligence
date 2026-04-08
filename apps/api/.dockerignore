@@ -33,6 +33,7 @@ htmlcov/
 # Documentation
 *.md
 docs/
+!README.md
 
 # Git
 .git/
