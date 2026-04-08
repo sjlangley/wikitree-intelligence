@@ -140,7 +140,19 @@ Execution model:
 
 ## PR Plan
 
-### PR1: Repo Skeleton + Test Harness + CI
+### PR1: Repo Skeleton + Test Harness + CI ✅ COMPLETE
+
+**Status:** Merged in PR #10 on 2026-04-08
+
+**Implemented:**
+- Docker infrastructure with multi-stage builds
+- GitHub Actions workflows for API and UI
+- docker-compose.yml with postgres, api, and ui services
+- Health check endpoints
+- Basic test infrastructure
+- Coverage gates established
+
+**Note:** Worker service will be added later when background job processing is implemented.
 
 Purpose:
 Create the smallest runnable project shell with coverage gates.
@@ -201,13 +213,25 @@ Acceptance:
 - one canonical model exists for people, relations, sources, external identities, and
   review snapshots
 - schema includes the minimum version 1 tables:
-  `app_users`, `app_sessions`, `wikitree_connections`, `import_jobs`,
+  `app_users`, `wikitree_connections`, `import_jobs`,
   `import_job_stages`, `people`, `person_names`, `person_facts`, `relationships`,
   `sources`, `external_identities`, `wikitree_search_runs`,
   `wikitree_search_candidates`, `match_reviews`, `evidence_packets`, and
   `sync_review_items`
+- sessions managed via signed cookies (no database table needed)
 
-### PR3: Backend Session Boundary
+### PR3: Backend Session Boundary ✅ COMPLETE
+
+**Status:** Implemented in current repo
+
+**Implemented:**
+- Google OAuth authentication flow
+- Backend-owned session management with signed cookies
+- Auth routes: `/auth/google/url`, `/auth/google/callback`, `/auth/logout`
+- User routes: `/auth/me` for current user retrieval
+- React `AuthProvider` with session restore on app load
+- Frontend login/logout flow with UI states
+- Comprehensive test coverage (API: 93%+, UI tests)
 
 Purpose:
 Implement backend-owned Google app auth and durable app sessions.
@@ -324,6 +348,7 @@ wikitree_dump_people
   user_id           -- WikiTree User ID (integer)
   wikitree_id       -- WikiTree-123 format
   first_name
+  middle_name       -- Important for disambiguation
   last_name_birth
   last_name_current
   birth_date        -- YYYY-MM-DD or decade for private
@@ -336,11 +361,13 @@ wikitree_dump_people
   privacy_level     -- 10-60 (see WikiTree privacy docs)
   photo_url
   is_connected      -- Part of main tree
+  extended_data     -- JSONB for API-only fields (Prefix, Suffix, Nicknames)
   dump_version_id   -- FK to wikitree_dump_versions
   INDEX (first_name, last_name_birth)
   INDEX (wikitree_id)
   INDEX (birth_date, birth_location)
   INDEX (father_id, mother_id)
+  GIN INDEX (extended_data)
 
 wikitree_dump_marriages
   user_id1          -- WikiTree User ID

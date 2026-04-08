@@ -401,10 +401,10 @@ Core tables:
 
 - `app_users`
   Google-authenticated app users.
-- `app_sessions`
-  Backend-owned sessions for signed-in users.
 - `wikitree_connections`
   Per-user WikiTree connection state, session metadata, and visibility scope.
+
+**Note on sessions:** v1 uses Starlette `SessionMiddleware` with signed cookies (no database table needed).
 - `import_jobs`
   One row per GEDCOM import, including top-level status, current stage, and worker-owned
   execution metadata.
@@ -452,13 +452,6 @@ app_users
   email
   display_name
   created_at
-
-app_sessions
-  id
-  user_id -> app_users.id
-  expires_at
-  created_at
-  last_seen_at
 
 wikitree_connections
   id
@@ -535,6 +528,7 @@ relationships
 
 sources
   id
+  import_job_id -> import_jobs.id (nullable)
   source_type
   citation_text
   source_detail_json
@@ -543,11 +537,14 @@ sources
 external_identities
   id
   person_id -> people.id
+  import_job_id -> import_jobs.id (nullable)
   provider
   external_key
   visibility_scope
   imported_at
   last_seen_at
+  UNIQUE INDEX (provider, external_key, import_job_id) WHERE import_job_id IS NOT NULL
+  UNIQUE INDEX (provider, external_key, person_id) WHERE import_job_id IS NULL
 
 wikitree_dump_versions
   id
@@ -566,6 +563,7 @@ wikitree_dump_people
   user_id (WikiTree User ID, INTEGER)
   wikitree_id (WikiTree-123 format)
   first_name
+  middle_name
   last_name_birth
   last_name_current
   birth_date
@@ -578,12 +576,14 @@ wikitree_dump_people
   privacy_level
   photo_url
   is_connected
+  extended_data (JSONB for API-only fields)
   dump_version_id -> wikitree_dump_versions.id
   PRIMARY KEY (user_id, dump_version_id)
   INDEX (first_name, last_name_birth)
   INDEX (wikitree_id)
   INDEX (birth_date, birth_location)
   INDEX (father_id, mother_id)
+  GIN INDEX (extended_data)
 
 wikitree_dump_marriages
   user_id1
