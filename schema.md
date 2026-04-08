@@ -381,6 +381,7 @@ CREATE TABLE wikitree_dump_people (
   dump_version_id UUID NOT NULL REFERENCES wikitree_dump_versions(id) ON DELETE CASCADE,
   wikitree_id TEXT NOT NULL,
   first_name TEXT,
+  middle_name TEXT,
   last_name_birth TEXT,
   last_name_current TEXT,
   birth_date TEXT,
@@ -393,6 +394,7 @@ CREATE TABLE wikitree_dump_people (
   privacy_level INTEGER,
   photo_url TEXT,
   is_connected BOOLEAN,
+  extended_data JSONB,
   PRIMARY KEY (user_id, dump_version_id)
 );
 
@@ -401,13 +403,22 @@ CREATE INDEX idx_wikitree_dump_people_name ON wikitree_dump_people(first_name, l
 CREATE INDEX idx_wikitree_dump_people_birth ON wikitree_dump_people(birth_date, birth_location);
 CREATE INDEX idx_wikitree_dump_people_parents ON wikitree_dump_people(father_id, mother_id);
 CREATE INDEX idx_wikitree_dump_people_version ON wikitree_dump_people(dump_version_id);
+CREATE INDEX idx_wikitree_dump_people_extended ON wikitree_dump_people USING GIN(extended_data);
 ```
 
 **Usage:**
 - Loaded by ingestion app from WikiTree TSV dumps
-- `user_id` is WikiTree's internal integer ID
+- `user_id` is WikiTree's internal integer ID (WikiTree API field: `Id`)
+- `wikitree_id` is the WikiTree profile name (WikiTree API field: `Name`, e.g., "Clemens-1")
+- `middle_name` matches WikiTree API field `MiddleName` — critical for disambiguation
+- `extended_data` stores additional API-only fields (Prefix, Suffix, Nicknames) when supplementing dump with live API calls
 - Fast local search without API calls
 - Privacy-aware: private profiles show decades instead of exact dates
+
+**Schema alignment note:**
+- This schema mirrors WikiTree API field names where possible
+- Dump TSV column names may differ from API field names — verify against actual dump format
+- When ingestion app loads dump, it should validate that all expected columns are present
 
 ---
 

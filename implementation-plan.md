@@ -348,6 +348,7 @@ wikitree_dump_people
   user_id           -- WikiTree User ID (integer)
   wikitree_id       -- WikiTree-123 format
   first_name
+  middle_name       -- Important for disambiguation
   last_name_birth
   last_name_current
   birth_date        -- YYYY-MM-DD or decade for private
@@ -360,11 +361,13 @@ wikitree_dump_people
   privacy_level     -- 10-60 (see WikiTree privacy docs)
   photo_url
   is_connected      -- Part of main tree
+  extended_data     -- JSONB for API-only fields (Prefix, Suffix, Nicknames)
   dump_version_id   -- FK to wikitree_dump_versions
   INDEX (first_name, last_name_birth)
   INDEX (wikitree_id)
   INDEX (birth_date, birth_location)
   INDEX (father_id, mother_id)
+  GIN INDEX (extended_data)
 
 wikitree_dump_marriages
   user_id1          -- WikiTree User ID
