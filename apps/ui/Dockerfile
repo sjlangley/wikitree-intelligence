@@ -1,5 +1,5 @@
 # Build stage
-FROM node:25-alpine AS builder
+FROM node:lts-alpine AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
 RUN npm run build
 
 # Runtime stage
-FROM node:25-alpine
+FROM node:lts-alpine
 
 WORKDIR /app
 
