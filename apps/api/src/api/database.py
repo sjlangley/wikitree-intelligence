@@ -348,7 +348,7 @@ class MatchReview(SQLModel, table=True):
     candidate_person_id: UUID | None = Field(
         default=None, foreign_key='people.id', index=True
     )
-    status: str = Field(
+    status: MatchReviewStatus = Field(
         sa_column=Column(SQLEnum(MatchReviewStatus), index=True, nullable=False)
     )
     classification: str  # exact | likely | possible | unlikely | no_match
