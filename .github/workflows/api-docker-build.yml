@@ -1,0 +1,93 @@
+name: API Docker Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - '!apps/api/*.md'
+      - '!apps/api/**/*.md'
+      - '.github/workflows/api-docker-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - '!apps/api/*.md'
+      - '!apps/api/**/*.md'
+      - '.github/workflows/api-docker-build.yml'
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: apps/api
+          push: false
+          load: true
+          tags: api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Docker container
+        run: |
+          docker run -d --name api-test \
+            --network host \
+            --memory 512m \
+            --cpus 1 \
+            -e ENVIRONMENT=development \
+            -e GOOGLE_OAUTH_CLIENT_ID='not-yet-a-real-client' \
+            -e SESSION_SECRET_KEY='not-a-real-secret' \
+            -e LLM_BASE_URL='http://localhost:8081' \
+            -e DATABASE_URL='sqlite+aiosqlite:///./test.db' \
+            -e CHROMA_HOST='http://localhost' \
+            api:test
+
+      - name: Wait for application to start and check health
+        run: |
+          echo "Waiting for application to start..."
+          max_attempts=30
+          attempt=0
+          sleep_duration=1
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s --max-time 5 --retry 2 --retry-delay 1 http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Application is healthy!"
+              response=$(curl -f -s --max-time 5 http://localhost:8080/health)
+              echo "Health check response: $response"
+              exit 0
+            fi
+            attempt=$((attempt + 1))
+            echo "Attempt $attempt/$max_attempts: Application not ready yet..."
+            sleep $sleep_duration
+
+            # Exponential backoff: increase sleep duration after first 10 attempts
+            if [ $attempt -eq 10 ] || [ $attempt -eq 20 ]; then
+              sleep_duration=$((sleep_duration + 1))
+              echo "Increasing retry interval to ${sleep_duration}s"
+            fi
+          done
+          echo "Health check failed: Application did not become healthy within timeout"
+          exit 1
+
+      - name: Check container logs
+        if: always()
+        run: docker logs api-test
+
+      - name: Stop container
+        if: always()
+        run: docker stop api-test && docker rm api-test
