@@ -294,6 +294,7 @@ Normalized source records and provenance references.
 ```sql
 CREATE TABLE sources (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  import_job_id UUID REFERENCES import_jobs(id) ON DELETE CASCADE,
   source_type TEXT NOT NULL CHECK (source_type IN ('gedcom', 'wikitree', 'document', 'manual', 'other')),
   citation_text TEXT NOT NULL,
   source_detail_json JSONB,
@@ -302,6 +303,7 @@ CREATE TABLE sources (
 );
 
 CREATE INDEX idx_sources_type ON sources(source_type);
+CREATE INDEX idx_sources_import_job ON sources(import_job_id);
 ```
 
 **Usage:**
@@ -309,6 +311,10 @@ CREATE INDEX idx_sources_type ON sources(source_type);
 - `citation_text` is human-readable citation
 - `source_detail_json` stores structured metadata
 - `imported_from` tracks original file or system
+- **GEDCOM provenance:** `import_job_id` links source to specific import
+  - Facts traced through `person_facts.source_id` can identify originating GEDCOM file
+  - Enables "show me all data from family-tree-v1.ged" queries
+- **Manual sources:** `import_job_id` NULL for user-entered citations
 
 ---
 
@@ -320,6 +326,7 @@ Links from canonical local people to external systems (GEDCOM, WikiTree).
 CREATE TABLE external_identities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   person_id UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  import_job_id UUID REFERENCES import_jobs(id) ON DELETE CASCADE,
   provider TEXT NOT NULL CHECK (provider IN ('gedcom', 'wikitree', 'familysearch', 'findagrave', 'other')),
   external_key TEXT NOT NULL,
   visibility_scope TEXT,
@@ -329,13 +336,30 @@ CREATE TABLE external_identities (
 
 CREATE INDEX idx_external_identities_person ON external_identities(person_id);
 CREATE INDEX idx_external_identities_provider ON external_identities(provider, external_key);
-CREATE UNIQUE INDEX idx_external_identities_unique ON external_identities(provider, external_key, person_id);
+CREATE INDEX idx_external_identities_import_job ON external_identities(import_job_id);
+
+-- For GEDCOM: unique per import job (same @I123@ can appear in different imports)
+CREATE UNIQUE INDEX idx_external_identities_import_scoped 
+  ON external_identities(provider, external_key, import_job_id) 
+  WHERE import_job_id IS NOT NULL;
+
+-- For WikiTree/etc: unique per person (no import job, manually matched)
+CREATE UNIQUE INDEX idx_external_identities_person_scoped 
+  ON external_identities(provider, external_key, person_id) 
+  WHERE import_job_id IS NULL;
 ```
 
 **Usage:**
 - Links local `people` to GEDCOM `@I123@` IDs and WikiTree `Smith-123` profiles
 - Only confirmed matches go here (not search candidates)
 - `visibility_scope` stores privacy level from WikiTree
+- **GEDCOM provenance:** `import_job_id` populated → tracks which GEDCOM file this identity came from
+  - Same GEDCOM ID (`@I123@`) from different imports = different people
+  - Prevents collision when importing multiple GEDCOMs with overlapping IDs
+- **WikiTree/manual matches:** `import_job_id` NULL → matched by user, not GEDCOM import
+- **Partial unique indexes** enforce:
+  - GEDCOM: one identity per (provider, external_key, import_job) — no duplicates within one import
+  - WikiTree: one identity per (provider, external_key, person) — person can't have same WikiTree ID twice
 
 ---
 

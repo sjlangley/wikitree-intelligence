@@ -528,6 +528,7 @@ relationships
 
 sources
   id
+  import_job_id -> import_jobs.id (nullable)
   source_type
   citation_text
   source_detail_json
@@ -536,11 +537,14 @@ sources
 external_identities
   id
   person_id -> people.id
+  import_job_id -> import_jobs.id (nullable)
   provider
   external_key
   visibility_scope
   imported_at
   last_seen_at
+  UNIQUE INDEX (provider, external_key, import_job_id) WHERE import_job_id IS NOT NULL
+  UNIQUE INDEX (provider, external_key, person_id) WHERE import_job_id IS NULL
 
 wikitree_dump_versions
   id
