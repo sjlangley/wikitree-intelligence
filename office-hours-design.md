@@ -843,14 +843,18 @@ The `wikitree_dump_versions` table tracks:
 - `record_count`, `marriage_count`: Sanity check counts
 - `status`: downloading, loading, ready, failed
 
+Search-facing person rows should store both:
+- `birth_date`: Full date when WikiTree provides an exact date
+- `birth_year`: Normalized year used for matching when only a year or decade is known
+
 Search queries always target the current dump:
 
 ```sql
 SELECT * FROM wikitree_dump_people wdp
 JOIN wikitree_dump_versions wdv ON wdp.dump_version_id = wdv.id
 WHERE wdv.is_current = true
-  AND wdp.first_name ILIKE ?
-  AND wdp.birth_date BETWEEN ? AND ?;
+  AND wdp.first_name ILIKE $1
+  AND wdp.birth_year BETWEEN $2 AND $3;
 ```
 
 This design supports:
