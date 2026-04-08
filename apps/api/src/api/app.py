@@ -92,9 +92,11 @@ async def lifespan(application: FastAPI):
     else:
         database_url = tcp_connection_url()
 
-    logger.info(
-        f'Final Database URL: {database_url!r}'
-    )  # Ensure this is redacted if it's a string
+    # Redact password from database URL for logging
+    safe_url = str(database_url)
+    if settings.database_password:
+        safe_url = safe_url.replace(f':{settings.database_password}@', ':***@')
+    logger.info(f'Final Database URL: {safe_url}')
 
     application.state.engine = create_async_engine(
         database_url, pool_pre_ping=True
