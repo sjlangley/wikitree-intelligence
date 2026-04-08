@@ -140,7 +140,19 @@ Execution model:
 
 ## PR Plan
 
-### PR1: Repo Skeleton + Test Harness + CI
+### PR1: Repo Skeleton + Test Harness + CI ✅ COMPLETE
+
+**Status:** Merged in PR #10 on 2026-04-08
+
+**Implemented:**
+- Docker infrastructure with multi-stage builds
+- GitHub Actions workflows for API and UI
+- docker-compose.yml with postgres, api, and ui services
+- Health check endpoints
+- Basic test infrastructure
+- Coverage gates established
+
+**Note:** Worker service will be added later when background job processing is implemented.
 
 Purpose:
 Create the smallest runnable project shell with coverage gates.
@@ -207,7 +219,18 @@ Acceptance:
   `wikitree_search_candidates`, `match_reviews`, `evidence_packets`, and
   `sync_review_items`
 
-### PR3: Backend Session Boundary
+### PR3: Backend Session Boundary ✅ COMPLETE
+
+**Status:** Implemented in current repo
+
+**Implemented:**
+- Google OAuth authentication flow
+- Backend-owned session management with signed cookies
+- Auth routes: `/auth/google/url`, `/auth/google/callback`, `/auth/logout`
+- User routes: `/auth/me` for current user retrieval
+- React `AuthProvider` with session restore on app load
+- Frontend login/logout flow with UI states
+- Comprehensive test coverage (API: 93%+, UI tests)
 
 Purpose:
 Implement backend-owned Google app auth and durable app sessions.
