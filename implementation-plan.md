@@ -52,9 +52,11 @@ Planning note:
 
 - Backend: Python
 - Worker: Python background process pulling import work from PostgreSQL
+- Ingestion: Separate Python app for WikiTree database dump loading (weekly)
 - Frontend: React + TypeScript
 - Database: PostgreSQL as the only source of truth
 - Raw GEDCOM storage: shared Docker volume in local development, object storage later
+- WikiTree dump cache: Local PostgreSQL tables refreshed weekly
 - Local orchestration: Docker Compose
 - Backend tests: `pytest`
 - Frontend tests: `vitest`
@@ -86,11 +88,18 @@ migrations/
 
 Use `apps/` as the monorepo home for runnable applications. In version 1 that means:
 
-- `apps/api/`
-- `apps/ui/`
+- `apps/api/` — HTTP API for UI and session management
+- `apps/ui/` — React frontend
+- `apps/ingestion/` — Separate WikiTree dump ingestion service (runs weekly)
 
 Use a separate worker process in v1, but keep the implementation inside `apps/api`
 until duplication is real enough to justify extraction.
+
+The ingestion app is separate because:
+- Runs on a different schedule (weekly, not continuous)
+- Requires different permissions (SFTP access to WikiTree dumps)
+- Has different failure modes (network issues, dump format changes)
+- Should not block or interfere with user-facing API or worker
 
 ## Architecture Spine
 
@@ -107,9 +116,15 @@ until duplication is real enough to justify extraction.
    +------> [worker]
               |-- claim queued jobs
               |-- run staged import/search batches
+              |-- search WikiTree dump cache (fast local)
+              |-- supplement with WikiTree API (private data only)
               |-- write checkpoints and outcomes
    v
-[postgres]
+[postgres]  <----  [ingestion app]
+                      |-- downloads weekly WikiTree dumps (Sunday nights)
+                      |-- parses TSV files
+                      |-- upserts wikitree_dump_* tables
+                      |-- tracks dump versions
 ```
 
 Execution model:
@@ -258,7 +273,92 @@ Acceptance:
 - backend owns WikiTree session material
 - private data is provenance-tagged as WikiTree-authenticated
 
-### PR5: Import Job API + Staged Pipeline Shell
+### PR5: WikiTree Dump Ingestion App
+
+Purpose:
+Create a separate ingestion application to load WikiTree weekly database dumps into
+PostgreSQL for fast local search.
+
+Files:
+- `apps/ingestion/main.py`
+- `apps/ingestion/dump_loader.py`
+- `apps/ingestion/sftp_client.py`
+- `apps/ingestion/parsers.py`
+- `apps/ingestion/tests/test_dump_loader.py`
+- `migrations/005_wikitree_dump_tables.sql`
+
+Why this is reviewable:
+- Single responsibility: load dump data
+- No UI coupling
+- Clear schema additions
+
+Tests:
+- parse sample TSV dump files
+- upsert logic handles updates correctly
+- dump version tracking
+- handles missing/corrupted files gracefully
+
+Acceptance:
+- ingestion app can download and parse WikiTree dumps
+- dump data loaded into `wikitree_dump_people`, `wikitree_dump_marriages` tables
+- `wikitree_dump_versions` tracks which dump is current
+- runs as separate Docker service on Sunday nights
+- API/worker can query dump cache for fast local search
+
+Schema additions:
+
+```sql
+wikitree_dump_versions
+  id
+  dump_date         -- Date the dump was created by WikiTree (YYYY-MM-DD)
+  downloaded_at     -- When we downloaded it
+  loaded_at         -- When we finished loading it
+  record_count      -- Number of people loaded
+  status            -- downloading, loading, ready, failed
+  is_current        -- Only one dump should be current=true
+  error_message
+  file_size_bytes
+  file_sha256
+
+wikitree_dump_people
+  user_id           -- WikiTree User ID (integer)
+  wikitree_id       -- WikiTree-123 format
+  first_name
+  last_name_birth
+  last_name_current
+  birth_date        -- YYYY-MM-DD or decade for private
+  death_date
+  birth_location
+  death_location
+  father_id         -- WikiTree User ID
+  mother_id         -- WikiTree User ID
+  gender
+  privacy_level     -- 10-60 (see WikiTree privacy docs)
+  photo_url
+  is_connected      -- Part of main tree
+  dump_version_id   -- FK to wikitree_dump_versions
+  INDEX (first_name, last_name_birth)
+  INDEX (wikitree_id)
+  INDEX (birth_date, birth_location)
+  INDEX (father_id, mother_id)
+
+wikitree_dump_marriages
+  user_id1          -- WikiTree User ID
+  user_id2          -- WikiTree User ID
+  marriage_date
+  marriage_location
+  dump_version_id   -- FK to wikitree_dump_versions
+  INDEX (user_id1, user_id2)
+```
+
+Implementation notes:
+- Use SFTP to download from apps.wikitree.com/dumps/
+- Parse tab-separated files with Python csv module
+- Upsert strategy: truncate old dump, insert new (simple)
+- Or: keep last 2 dumps for rollback capability
+- Track which dump is "current" for search queries
+
+### PR6: Import Job API + Staged Pipeline Shell
 
 Purpose:
 Create resumable staged import jobs and a worker-owned execution loop without full
@@ -316,7 +416,7 @@ The first cut should keep this boring:
 - the API never performs long import/search work inline; it only enqueues and reports
   status
 
-### PR6: GEDCOM Parse + Normalize
+### PR7: GEDCOM Parse + Normalize
 
 Purpose:
 Turn uploaded GEDCOM into normalized people, relations, and source provenance.
@@ -345,7 +445,7 @@ Acceptance:
 - worker can persist partial batch progress during large imports
 - failure states are explicit and recoverable
 
-### PR7: Anchor Flow + Matching Pipeline
+### PR8: Anchor Flow + Matching Pipeline
 
 Purpose:
 Implement the first real “whoa” path, anchor one person and generate candidate matches.
@@ -379,7 +479,7 @@ Acceptance:
 - a searched person can end the run as `needs_review` or `no_safe_match`
 - matching/search work can be resumed by the worker from the last durable checkpoint
 
-### PR8: Review Receipts + Evidence Packets
+### PR9: Review Receipts + Evidence Packets
 
 Purpose:
 Persist review snapshots, decisions, and evidence packets as stable receipts.
@@ -408,7 +508,7 @@ Acceptance:
 - UI clearly separates `needs review`, `missing from WikiTree`, and `resolved`
   outcomes
 
-### PR9: Traversal Through Resolved Matches + Auto-Accept Rules
+### PR10: Traversal Through Resolved Matches + Auto-Accept Rules
 
 Purpose:
 Make the engine continue outward through confident matches and auto-accept only when
@@ -434,7 +534,7 @@ Tests:
 Acceptance:
 - engine spends attention on gaps and disagreements, not settled identity work
 
-### PR10: Later Sync-Review Queue
+### PR11: Later Sync-Review Queue
 
 Purpose:
 Create the separate queue for already-matched profiles with useful GEDCOM-only facts.
@@ -462,7 +562,7 @@ Acceptance:
 - later sync-review is distinct from the `missing from WikiTree` queue and from
   unresolved candidate review
 
-### PR11: End-to-End Hardening
+### PR12: End-to-End Hardening
 
 Purpose:
 Add Playwright coverage for the critical user flows and Compose smoke checks.

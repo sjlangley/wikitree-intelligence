@@ -37,6 +37,7 @@ Planning and architecture documentation:
 ## Planned Stack
 
 - `apps/api/` — Python backend
+- `apps/ingestion/` — WikiTree dump loading service (runs weekly)
 - planned background worker component for staged import/search jobs
 - `apps/ui/` — React + TypeScript frontend
 - `apps/api/tests/` — backend tests
@@ -44,12 +45,15 @@ Planning and architecture documentation:
 - `e2e/` — Playwright end-to-end tests
 - `migrations/` — database migrations
 - shared Docker volume — raw uploaded GEDCOM storage in local development
+- PostgreSQL — WikiTree dump cache (refreshed weekly) + app data
 - `docker-compose.yml` — local orchestration
 
 ## Version 1 Goals
 
 - Google-authenticated app session
 - WikiTree-authenticated private-data reads through the backend
+- WikiTree weekly dump cache for fast local search (millions of profiles)
+- hybrid search: local dump first, API supplement when needed
 - staged, resumable GEDCOM imports
 - background worker execution for large import/search jobs
 - one canonical person/relationship model

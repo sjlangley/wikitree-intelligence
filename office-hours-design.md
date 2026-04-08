@@ -258,8 +258,10 @@ Suggested version 1 stack shape:
 - `frontend`: React + TypeScript
 - `api`: Python service
 - `worker`: Python background process that pulls queued jobs from PostgreSQL
+- `ingestion`: Separate Python app for WikiTree dump loading (weekly)
 - `db`: PostgreSQL
 - `gedcom_data`: shared Docker volume for raw uploaded GEDCOM files
+- `wikitree_cache`: Local PostgreSQL tables with weekly WikiTree dump data
 - `auth`: Google sign-in for app identity
 - `compose`: local orchestration for repeatable setup and future cloud portability
 
@@ -423,6 +425,12 @@ Core tables:
 - `external_identities`
   Links from a canonical local person to external systems like GEDCOM records or WikiTree
   profiles.
+- `wikitree_dump_versions`
+  Tracks which WikiTree weekly dumps have been loaded, which is current, and load status.
+- `wikitree_dump_people`
+  Local cache of WikiTree public profiles from weekly dumps for fast search without API calls.
+- `wikitree_dump_marriages`
+  Local cache of WikiTree marriage relationships from weekly dumps.
 - `wikitree_search_runs`
   Cached per-person WikiTree search attempts, query plans, and top-level outcomes.
 - `wikitree_search_candidates`
@@ -541,11 +549,57 @@ external_identities
   imported_at
   last_seen_at
 
+wikitree_dump_versions
+  id
+  dump_date
+  downloaded_at
+  loaded_at
+  record_count
+  marriage_count
+  status
+  is_current
+  error_message
+  file_size_bytes
+  file_sha256
+
+wikitree_dump_people
+  user_id (WikiTree User ID, INTEGER)
+  wikitree_id (WikiTree-123 format)
+  first_name
+  last_name_birth
+  last_name_current
+  birth_date
+  death_date
+  birth_location
+  death_location
+  father_id
+  mother_id
+  gender
+  privacy_level
+  photo_url
+  is_connected
+  dump_version_id -> wikitree_dump_versions.id
+  PRIMARY KEY (user_id, dump_version_id)
+  INDEX (first_name, last_name_birth)
+  INDEX (wikitree_id)
+  INDEX (birth_date, birth_location)
+  INDEX (father_id, mother_id)
+
+wikitree_dump_marriages
+  user_id1
+  user_id2
+  marriage_date
+  marriage_location
+  dump_version_id -> wikitree_dump_versions.id
+  PRIMARY KEY (user_id1, user_id2, dump_version_id)
+
 wikitree_search_runs
   id
   import_job_id -> import_jobs.id
   user_id -> app_users.id
   subject_person_id -> people.id
+  used_dump_version_id -> wikitree_dump_versions.id
+  used_api_call
   status
   outcome
   query_plan_json
@@ -722,6 +776,118 @@ The review queue should prioritize what is actually interesting:
 
 It should de-prioritize already-resolved confident matches except as supporting context
 for continued outward traversal.
+
+## WikiTree Dump Caching Strategy
+
+Version 1 should use WikiTree's weekly database dumps as the primary data source for
+initial search and matching, falling back to the WikiTree API only when necessary.
+
+WikiTree provides weekly tab-separated dump files via SFTP containing:
+
+- `dump_people_users`: All public and semi-public profiles (excludes living & unlisted)
+- `dump_people_marriages`: Spouse relationships
+- `dump_people_photos`: Image URLs
+- `dump_categories`: Profile categories
+- `dump_managers`: Profile managers
+
+Dumps are updated every Sunday night and include privacy-controlled data. Private
+profiles have limited fields (birth decade instead of exact date, preferred name instead
+of formal name, etc.).
+
+### Hybrid Search Strategy
+
+The matching pipeline should search local dump cache first, then supplement with API
+calls only when needed:
+
+1. **Local dump search (fast, no rate limits):**
+   - PostgreSQL full-text search on names
+   - GIN indexes on birth year + location
+   - Parent/child relationship graph joins
+   - Returns all public candidates instantly
+
+2. **Supplement with API when:**
+   - Local search finds no safe match (person might be living/unlisted)
+   - User needs private data visible only when authenticated
+   - Dump is stale (>7 days old) and recent updates matter
+   - Relationship traversal requires non-public family tree
+
+3. **Cache search results:**
+   - Track which dump version was used (`wikitree_search_runs.used_dump_version_id`)
+   - Record whether API was called (`wikitree_search_runs.used_api_call`)
+   - Avoid re-searching same person until dump refreshes
+
+### Ingestion Application
+
+A separate `apps/ingestion/` service handles dump loading:
+
+- **Runs weekly** on Sunday nights after WikiTree publishes new dumps
+- **Downloads via SFTP** from apps.wikitree.com/dumps/
+- **Parses TSV files** into PostgreSQL tables
+- **Tracks versions** in `wikitree_dump_versions` table
+- **Marks current dump** with `is_current=true` flag
+- **Independent from API/worker** to avoid blocking user-facing services
+
+Ingestion is separate because:
+- Different schedule (weekly cron vs. continuous)
+- Different permissions (SFTP credentials vs. application auth)
+- Different failure modes (network issues, TSV format changes)
+- Should not interfere with live API or background worker
+
+### Version Tracking
+
+The `wikitree_dump_versions` table tracks:
+- `dump_date`: When WikiTree created the dump (YYYY-MM-DD format)
+- `downloaded_at`: When ingestion downloaded it
+- `loaded_at`: When loading completed successfully
+- `is_current`: Only one dump marked as current for searches
+- `record_count`, `marriage_count`: Sanity check counts
+- `status`: downloading, loading, ready, failed
+
+Search-facing person rows should store both:
+- `birth_date`: Full date when WikiTree provides an exact date
+- `birth_year`: Normalized year used for matching when only a year or decade is known
+
+Search queries always target the current dump:
+
+```sql
+SELECT * FROM wikitree_dump_people wdp
+JOIN wikitree_dump_versions wdv ON wdp.dump_version_id = wdv.id
+WHERE wdv.is_current = true
+  AND wdp.first_name ILIKE $1
+  AND wdp.birth_year BETWEEN $2 AND $3;
+```
+
+This design supports:
+- Zero-downtime dump refreshes (load new dump, swap `is_current` flag)
+- Rollback capability (keep last 2 dumps, flip `is_current` back)
+- Auditing which dump version was used for each search run
+
+### Compliance Requirements
+
+Per WikiTree's database dump terms:
+
+1. **Permission required:** Must email jamie@wikitree.com with WikiTree ID and project
+   description before accessing dumps
+2. **Weekly updates mandatory:** Privacy settings change daily, must refresh dumps to
+   respect privacy changes
+3. **Link back to WikiTree:** All matched profiles must link to original WikiTree URL
+4. **No redistribution:** Cannot expose dump data via own API, only use internally
+5. **Non-commercial use:** Project must be consistent with WikiTree's free-tree pledge
+
+### Performance Benefits
+
+Using local dump cache provides:
+- **10-100x faster searches:** PostgreSQL indexes vs. API round trips
+- **No rate limiting:** Search millions of profiles without throttling
+- **Offline capability:** Initial matching works without internet
+- **Reduced WikiTree load:** Good citizenship, fewer API calls
+- **Better UX:** Instant candidate lists instead of waiting for API
+
+API calls remain valuable for:
+- Private family tree access (requires authentication)
+- Living people (excluded from dumps)
+- Unlisted profiles (privacy level 10, not in dumps)
+- Recent updates within the current week
 
 ## Work Queues
 
