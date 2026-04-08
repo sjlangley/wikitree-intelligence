@@ -1,0 +1,95 @@
+
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wikitree-intelligence-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wikitree_intelligence
+      POSTGRES_USER: wikitree
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U wikitree -d wikitree_intelligence"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wikitree-network
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: wikitree-intelligence-api
+    restart: unless-stopped
+    environment:
+      # Server configuration
+      PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+
+      # CORS configuration
+      CLIENT_ORIGINS: ${CLIENT_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}
+
+      # Authentication
+      AUTH_DISABLED: ${AUTH_DISABLED:-false}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID must be set}
+      ALLOWED_HOSTED_DOMAINS: ${ALLOWED_HOSTED_DOMAINS:-[]}
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:?SESSION_SECRET_KEY must be set}
+
+      # Database configuration
+      DATABASE_URL: postgresql+asyncpg://wikitree:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/wikitree_intelligence
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - gedcom_data:/app/gedcom_data
+    networks:
+      - wikitree-network
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  ui:
+    build:
+      context: ./apps/ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:?VITE_GOOGLE_CLIENT_ID must be set}
+    container_name: wikitree-intelligence-ui
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - wikitree-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
+    driver: local
+  gedcom_data:
+    driver: local
+
+networks:
+  wikitree-network:
+    driver: bridge
