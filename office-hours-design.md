@@ -401,10 +401,10 @@ Core tables:
 
 - `app_users`
   Google-authenticated app users.
-- `app_sessions`
-  Backend-owned sessions for signed-in users.
 - `wikitree_connections`
   Per-user WikiTree connection state, session metadata, and visibility scope.
+
+**Note on sessions:** v1 uses Starlette `SessionMiddleware` with signed cookies (no database table needed).
 - `import_jobs`
   One row per GEDCOM import, including top-level status, current stage, and worker-owned
   execution metadata.
@@ -452,13 +452,6 @@ app_users
   email
   display_name
   created_at
-
-app_sessions
-  id
-  user_id -> app_users.id
-  expires_at
-  created_at
-  last_seen_at
 
 wikitree_connections
   id

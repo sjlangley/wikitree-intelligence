@@ -213,11 +213,12 @@ Acceptance:
 - one canonical model exists for people, relations, sources, external identities, and
   review snapshots
 - schema includes the minimum version 1 tables:
-  `app_users`, `app_sessions`, `wikitree_connections`, `import_jobs`,
+  `app_users`, `wikitree_connections`, `import_jobs`,
   `import_job_stages`, `people`, `person_names`, `person_facts`, `relationships`,
   `sources`, `external_identities`, `wikitree_search_runs`,
   `wikitree_search_candidates`, `match_reviews`, `evidence_packets`, and
   `sync_review_items`
+- sessions managed via signed cookies (no database table needed)
 
 ### PR3: Backend Session Boundary ✅ COMPLETE
 

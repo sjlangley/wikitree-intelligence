@@ -19,8 +19,9 @@ Version 1 PostgreSQL schema for the WikiTree Intelligence workbench.
 ### Authentication & Session Management
 
 - `app_users` - Google-authenticated users
-- `app_sessions` - Backend session state
 - `wikitree_connections` - Per-user WikiTree auth and scope
+
+**Note on sessions:** v1 uses Starlette `SessionMiddleware` with signed cookies (no database table needed). Database-backed sessions can be added later if hosting multi-user version.
 
 ### Import Jobs & Staging
 
@@ -73,32 +74,10 @@ CREATE INDEX idx_app_users_email ON app_users(email);
 - `google_subject` is the stable Google user ID (from JWT `sub` claim)
 - All user-owned data references this table
 
----
-
-### app_sessions
-
-Backend-managed session state for signed-in users.
-
-```sql
-CREATE TABLE app_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
-  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_app_sessions_user_id ON app_sessions(user_id);
-CREATE INDEX idx_app_sessions_expires_at ON app_sessions(expires_at);
-```
-
-**Usage:**
-- Session cookie stores session ID (signed, httpOnly)
-- Backend retrieves session and user on each authenticated request
-- `last_seen_at` updated on activity for session housekeeping
-- Expired sessions purged by background cleanup task
-
-**Note:** Current implementation uses Starlette `SessionMiddleware` with signed cookies rather than database-backed sessions. This table is for future use.
+**Session Management:**
+- v1 uses Starlette `SessionMiddleware` with signed, httpOnly cookies
+- No database table needed - session data (user_id) stored in encrypted cookie
+- Simpler for local-first, can migrate to database sessions if hosting multi-user version
 
 ---
 
