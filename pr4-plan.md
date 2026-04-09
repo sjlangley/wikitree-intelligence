@@ -21,20 +21,46 @@ Add WikiTree authentication and backend-owned private-data access. This PR estab
 
 ## WikiTree API Authentication Research
 
-### Authentication Flow
+### Authentication Flow (Browser-Based)
 
-WikiTree API uses a custom authentication mechanism:
+WikiTree uses a session-cookie based authentication (not OAuth):
 
-1. **Login Method**: `login` action with `email` and `password` or `wpPassword`
-2. **Session Management**: Returns a session cookie or token
-3. **Private Data Access**: Requires valid authenticated session
-4. **API Base URL**: `https://api.wikitree.com/api.php`
+1. **Redirect to Login**: Send user to `https://api.wikitree.com/api.php?action=clientLogin&returnURL=[encodedURL]`
+2. **User Authenticates**: User provides credentials at WikiTree.com
+3. **Cookie Issued**: WikiTree sets session cookies on `api.wikitree.com` domain  
+4. **Redirect with AuthCode**: User redirected back to app with `authcode` parameter
+5. **Validate AuthCode**: App calls `clientLogin` with authcode to get `user_id` and `user_name`
+6. **Future API Calls**: All API endpoints automatically use cookies (with `withCredentials: true`)
+7. **Logout**: Redirect to `clientLogin&doLogout=1` clears cookies
 
-Key API actions needed:
-- `login` - Authenticate user and establish session
-- `logout` - End WikiTree session
-- `getProfile` - Get profile data (public or private based on auth)
-- `getPerson` - Get person details with privacy awareness
+### Key Insights for Backend-Owned Auth
+
+Since our app is **backend-owned** (not pure browser SPA), we need a proxy pattern:
+
+1. Frontend initiates connection → Backend starts OAuth-like flow  
+2. Backend generates returnURL pointing to itself
+3. User completes auth at WikiTree → redirected to backend callback
+4. Backend receives authcode, validates it, stores WikiTree user_id
+5. Backend manages session cookies for future WikiTree API calls
+6. **Problem**: Cookies are domain-bound to `api.wikitree.com` - backend can't store them traditionally
+
+### Solution: Server-Side Session Management
+
+**Approach**: The backend orchestrates the flow but cookies stay browser-side:
+
+1. Backend provides `/wikitree/connect/initiate` → returns WikiTree login URL
+2. Frontend redirects user to WikiTree login URL  
+3. User authenticates → WikiTree redirects to `/wikitree/connect/callback`
+4. Backend callback validates authcode → stores WikiTree user_id in database
+5. **Cookie Strategy**: Frontend stores session state; backend validates before proxying
+6. Backend acts as authenticated proxy for WikiTree API calls
+
+### Alternative: Non-Browser Authentication (For Worker/Scheduled Tasks)
+
+For backend-only operations (like dump ingestion), use Python example pattern:
+- Store credentials securely (encrypted)
+- POSTauthcode directly
+- Manage session in backend HTTP client (httpx)
 
 ### Privacy Levels (from database schema)
 - 10: Public
