@@ -1,7 +1,5 @@
 """Tests for match review state machine transitions."""
 
-import pytest
-
 from api.state_machines import (
     MATCH_REVIEW_TRANSITIONS,
     get_match_review_terminal_states,
@@ -50,21 +48,15 @@ class TestMatchReviewStates:
 
     def test_invalid_auto_derived_to_approved(self):
         """Test auto_derived is terminal - system-generated."""
-        assert not is_valid_match_review_transition(
-            'auto_derived', 'approved'
-        )
+        assert not is_valid_match_review_transition('auto_derived', 'approved')
 
     def test_invalid_auto_derived_to_rejected(self):
         """Test auto_derived is terminal - system-generated."""
-        assert not is_valid_match_review_transition(
-            'auto_derived', 'rejected'
-        )
+        assert not is_valid_match_review_transition('auto_derived', 'rejected')
 
     def test_invalid_pending_to_auto_derived(self):
         """Test auto_derived cannot be set manually from pending."""
-        assert not is_valid_match_review_transition(
-            'pending', 'auto_derived'
-        )
+        assert not is_valid_match_review_transition('pending', 'auto_derived')
 
     def test_invalid_deferred_to_pending(self):
         """Test deferred cannot go back to pending."""

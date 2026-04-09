@@ -17,6 +17,7 @@ dependencies = [
     "fastapi==0.135.2",
     "google-auth==2.48.0",
     "gunicorn==25.1.0",
+    "httpx>=0.28.1,<1.0.0",
     "pydantic==2.12.5",
     "pydantic-settings==2.13.1",
     "itsdangerous==2.2.0",
@@ -39,7 +40,6 @@ classifiers = [
 [project.optional-dependencies]
 dev = [
     "asgi-lifespan==2.1.0",
-    "httpx>=0.28.1,<1.0.0",
     "pydocstyle==6.3.0",
     "pyrefly==0.59.0",
     "pytest==9.0.2",

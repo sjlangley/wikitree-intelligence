@@ -4,6 +4,9 @@
  */
 
 import { useAuth } from '../lib/auth';
+import { getWikiTreeStatus } from '../lib/api';
+import { WikiTreeSettingsPage } from './WikiTreeSettingsPage';
+import { useEffect, useState } from 'react';
 import type { User } from '../types/api';
 
 interface LoggedInScreenProps {
@@ -12,6 +15,23 @@ interface LoggedInScreenProps {
 
 export function LoggedInScreen({ user }: LoggedInScreenProps) {
   const { logout } = useAuth();
+  const [wikiTreeConnected, setWikiTreeConnected] = useState(false);
+
+  const fetchWikiTreeStatus = () => {
+    getWikiTreeStatus()
+      .then((data) => {
+        setWikiTreeConnected(data.is_connected);
+      })
+      .catch(() => {
+        // Ignore errors, default to disconnected
+        setWikiTreeConnected(false);
+      });
+  };
+
+  useEffect(() => {
+    // Check WikiTree connection status on mount
+    fetchWikiTreeStatus();
+  }, []);
 
   async function handleLogout() {
     await logout();
@@ -43,14 +63,17 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
             <p className="section-eyebrow">No import in progress</p>
             <h2>Start with a GEDCOM, then work outward.</h2>
             <p>
-              This should be the first screen a signed-in researcher sees when there is no active
-              import. Start a new GEDCOM import, reconnect WikiTree, or clear local data before you
-              begin another pass.
+              Connect to WikiTree in the sidebar to enable profile matching, then import a GEDCOM
+              file to begin reconciling your tree.
             </p>
           </div>
           <div className="status-row" role="group" aria-label="Session status">
             <span className="status-pill status-pill-confirmed">Google session active</span>
-            <span className="status-pill status-pill-review">WikiTree not connected yet</span>
+            <span
+              className={`status-pill ${wikiTreeConnected ? 'status-pill-confirmed' : 'status-pill-review'}`}
+            >
+              {wikiTreeConnected ? 'WikiTree connected' : 'WikiTree not connected'}
+            </span>
           </div>
         </div>
 
@@ -70,10 +93,11 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
                 <button
                   className="button-secondary"
                   type="button"
-                  disabled
-                  title="Coming soon: WikiTree reconnect is not available yet."
+                  onClick={() => {
+                    document.querySelector('.home-sidebar')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
                 >
-                  Reconnect WikiTree
+                  Connect WikiTree
                 </button>
                 <button
                   className="button-secondary"
@@ -92,7 +116,7 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
                   Clear existing data
                 </button>
                 <p className="section-eyebrow" aria-live="polite">
-                  These actions are coming soon and are temporarily unavailable.
+                  GEDCOM import and data management features are coming soon.
                 </p>
               </div>
             </div>
@@ -123,6 +147,8 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
           </section>
 
           <aside className="home-sidebar">
+            <WikiTreeSettingsPage onStatusChange={fetchWikiTreeStatus} />
+
             <div className="panel-card panel-card-muted">
               <h3>User session</h3>
               <dl className="detail-list">

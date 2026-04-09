@@ -6,11 +6,14 @@ These models serve as:
 - Single source of truth for the schema
 """
 
+from collections.abc import AsyncGenerator
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from fastapi import Request
 from sqlalchemy import Date, Enum as SQLEnum
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import JSON, Column, Field, SQLModel
 
 from api.state_machines import (
@@ -42,7 +45,9 @@ class WikiTreeConnection(SQLModel, table=True):
     __tablename__ = 'wikitree_connections'  # pyrefly: ignore[bad-override]
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: UUID = Field(foreign_key='app_users.id', index=True, unique=True)
+    # user_id stores Google subject ID directly (not FK to app_users)
+    # because auth uses JWT validation, not database user lookups
+    user_id: str = Field(index=True, unique=True)
     wikitree_user_key: str | None = None
     status: str  # connected | disconnected | expired | failed
     session_ref: str | None = None
@@ -390,3 +395,21 @@ class SyncReviewItem(SQLModel, table=True):
     provenance_json: dict[str, Any] = Field(sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     reviewed_at: datetime | None = None
+
+
+# ============================================================================
+# Database Session Management
+# ============================================================================
+
+
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency for database session.
+
+    Args:
+        request: FastAPI request object with app state containing engine
+
+    Yields:
+        Async database session
+    """
+    async with AsyncSession(request.app.state.engine) as session:
+        yield session

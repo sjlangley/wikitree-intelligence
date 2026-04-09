@@ -1,7 +1,5 @@
 """Tests for import job state machine transitions."""
 
-import pytest
-
 from api.state_machines import (
     IMPORT_JOB_STAGE_TRANSITIONS,
     IMPORT_JOB_TRANSITIONS,
@@ -106,9 +104,7 @@ class TestImportJobStageStates:
 
     def test_in_progress_to_completed(self):
         """Test valid transition from in_progress to completed."""
-        assert is_valid_import_job_stage_transition(
-            'in_progress', 'completed'
-        )
+        assert is_valid_import_job_stage_transition('in_progress', 'completed')
 
     def test_in_progress_to_failed(self):
         """Test valid transition from in_progress to failed."""
@@ -132,9 +128,7 @@ class TestImportJobStageStates:
 
     def test_invalid_pending_to_completed(self):
         """Test invalid jump from pending to completed."""
-        assert not is_valid_import_job_stage_transition(
-            'pending', 'completed'
-        )
+        assert not is_valid_import_job_stage_transition('pending', 'completed')
 
     def test_invalid_completed_to_in_progress(self):
         """Test completed is terminal - cannot restart."""
@@ -144,9 +138,7 @@ class TestImportJobStageStates:
 
     def test_invalid_completed_to_retrying(self):
         """Test completed stages cannot be retried."""
-        assert not is_valid_import_job_stage_transition(
-            'completed', 'retrying'
-        )
+        assert not is_valid_import_job_stage_transition('completed', 'retrying')
 
     def test_invalid_unknown_from_state(self):
         """Test transition from unknown state returns False."""

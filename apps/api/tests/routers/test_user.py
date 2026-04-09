@@ -10,7 +10,7 @@ async def test_get_current_user_endpoint(authenticated_async_test_client):
     assert response.status_code == 200
     data = response.json()
     assert data['email'] == 'test_user@test.org'
-    assert data['userid'] == 'test-oid-123'
+    assert data['userid'] == 'test-google-subject-id-123456789'
     assert data['name'] == 'Test User'
 
 

@@ -10,7 +10,7 @@ from api.models.user import User
 from api.security.security import get_current_google_user
 
 TEST_USER_EMAIL = 'test_user@test.org'
-TEST_USER_ID = 'test-oid-123'
+TEST_USER_ID = 'test-google-subject-id-123456789'  # Google subject ID
 TEST_USER_NAME = 'Test User'
 
 
