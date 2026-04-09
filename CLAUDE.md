@@ -876,6 +876,79 @@ app = FastAPI(lifespan=lifespan)
 - Pass type checking (UI: `npm run build`, API: `pyrefly check`)
 - Maintain or improve code coverage (target: 80%+)
 
+## Pre-Commit Checklist
+
+**🚨 CRITICAL: Run ALL checks BEFORE every commit. Never push broken code.**
+
+### Backend Pre-Commit (Required)
+
+```bash
+cd apps/api
+source ../../.venv/bin/activate
+
+# 1. Run tests (REQUIRED - must pass 100%)
+pytest --tb=short
+
+# 2. Check linting (REQUIRED - must pass)
+ruff check src/
+
+# 3. Check formatting (REQUIRED - must pass)
+ruff format --check src/
+
+# 4. Type check (REQUIRED - must pass)
+pyrefly check src/
+
+# If any checks fail, fix them before committing
+```
+
+### Frontend Pre-Commit (Required)
+
+```bash
+cd apps/ui
+
+# 1. Run tests (REQUIRED - must pass 100%)
+npm run test
+
+# 2. Check linting (REQUIRED - must pass)
+npm run lint
+
+# 3. Check formatting (REQUIRED - auto-fix)
+npm run format
+
+# 4. Type check (REQUIRED - must pass)
+npm run build
+
+# If any checks fail, fix them before committing
+```
+
+### Pre-Commit Workflow
+
+1. **Make your changes**
+2. **Run pre-commit checks for affected code**
+   - Changed backend? Run backend checks
+   - Changed frontend? Run frontend checks  
+   - Changed both? Run both sets of checks
+3. **Fix any failures** - Do not commit if checks fail
+4. **Commit only after ALL checks pass**
+5. **Push to remote**
+
+**Example:**
+
+```bash
+# After making backend changes
+cd apps/api
+source ../../.venv/bin/activate
+pytest --tb=short && ruff check src/ && ruff format --check src/ && pyrefly check src/
+
+# If all pass:
+git add -A
+git commit -m "feat: add new feature"
+git push
+
+# If any fail:
+# Fix the issues, then re-run checks before committing
+```
+
 **Before submitting (UI):**
 
 ```bash
