@@ -10,6 +10,16 @@ updates:
     schedule:
       interval: "quarterly"
 
+  - package-ecosystem: "docker"
+    directory: "/apps/ui"
+    schedule:
+      interval: "quarterly"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/api"
+    schedule:
+      interval: "quarterly"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
