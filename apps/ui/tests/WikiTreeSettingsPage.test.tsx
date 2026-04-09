@@ -146,9 +146,7 @@ describe('WikiTreeSettingsPage', () => {
     );
 
     // Mock disconnect fetch
-    mockFetch.mockResolvedValueOnce(
-      createMockResponse(null, { status: 204 })
-    );
+    mockFetch.mockResolvedValueOnce(createMockResponse(null, { status: 204 }));
 
     // Mock status fetch after disconnect
     mockFetch.mockResolvedValueOnce(

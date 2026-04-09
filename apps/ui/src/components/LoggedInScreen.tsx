@@ -22,7 +22,7 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
 
   const fetchWikiTreeStatus = () => {
     fetch('/api/wikitree/status')
-      .then(res => res.json())
+      .then((res) => res.json())
       .then((data: WikiTreeStatus) => {
         setWikiTreeConnected(data.is_connected);
       })
@@ -67,13 +67,15 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
             <p className="section-eyebrow">No import in progress</p>
             <h2>Start with a GEDCOM, then work outward.</h2>
             <p>
-              Connect to WikiTree in the sidebar to enable profile matching, then import a GEDCOM file
-              to begin reconciling your tree.
+              Connect to WikiTree in the sidebar to enable profile matching, then import a GEDCOM
+              file to begin reconciling your tree.
             </p>
           </div>
           <div className="status-row" role="group" aria-label="Session status">
             <span className="status-pill status-pill-confirmed">Google session active</span>
-            <span className={`status-pill ${wikiTreeConnected ? 'status-pill-confirmed' : 'status-pill-review'}`}>
+            <span
+              className={`status-pill ${wikiTreeConnected ? 'status-pill-confirmed' : 'status-pill-review'}`}
+            >
               {wikiTreeConnected ? 'WikiTree connected' : 'WikiTree not connected'}
             </span>
           </div>

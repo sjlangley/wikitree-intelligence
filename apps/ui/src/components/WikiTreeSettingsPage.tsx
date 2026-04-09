@@ -27,23 +27,7 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Fetch connection status on mount
-  useEffect(() => {
-    fetchStatus();
-  }, []);
-
-  // Handle OAuth callback with authcode
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const authcode = urlParams.get('authcode');
-
-    if (authcode) {
-      handleCallback(authcode);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, [handleCallback]);
-
+  // Define all functions/callbacks first
   async function fetchStatus() {
     try {
       setLoading(true);
@@ -157,6 +141,24 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
     }
   }
 
+  // Effects after all functions are defined
+  // Fetch connection status on mount
+  useEffect(() => {
+    fetchStatus();
+  }, []);
+
+  // Handle OAuth callback with authcode
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const authcode = urlParams.get('authcode');
+
+    if (authcode) {
+      handleCallback(authcode);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [handleCallback]);
+
   if (loading && !status) {
     return (
       <div className="panel-card">
@@ -193,11 +195,15 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
               </div>
               <div className="detail-item">
                 <dt>Connected at:</dt>
-                <dd>{status.connected_at ? new Date(status.connected_at).toLocaleString() : 'Unknown'}</dd>
+                <dd>
+                  {status.connected_at ? new Date(status.connected_at).toLocaleString() : 'Unknown'}
+                </dd>
               </div>
               <div className="detail-item">
                 <dt>Expires at:</dt>
-                <dd>{status.expires_at ? new Date(status.expires_at).toLocaleString() : 'Unknown'}</dd>
+                <dd>
+                  {status.expires_at ? new Date(status.expires_at).toLocaleString() : 'Unknown'}
+                </dd>
               </div>
               {status.last_verified_at && (
                 <div className="detail-item">
@@ -241,18 +247,14 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
 
           <details className="connection-help">
             <summary>Why connect WikiTree?</summary>
-            <p>
-              Connecting your WikiTree account allows WikiTree Intelligence to:
-            </p>
+            <p>Connecting your WikiTree account allows WikiTree Intelligence to:</p>
             <ul>
               <li>Access your private profiles and trusted connections</li>
               <li>Match GEDCOM records against your WikiTree network</li>
               <li>Suggest merges and corrections</li>
               <li>Respect privacy settings when importing</li>
             </ul>
-            <p>
-              Your WikiTree session is stored securely and expires after 30 days of inactivity.
-            </p>
+            <p>Your WikiTree session is stored securely and expires after 30 days of inactivity.</p>
           </details>
         </div>
       )}
