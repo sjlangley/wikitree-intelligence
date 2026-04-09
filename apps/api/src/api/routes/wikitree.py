@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncGenerator
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -18,6 +17,7 @@ from api.database import get_db
 from api.models.user import User
 from api.security.session_auth import get_current_user
 from api.wikitree import WikiTreeClient, WikiTreeSessionManager
+from api.wikitree.client import WikiTreeAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +27,16 @@ router = APIRouter(prefix='/wikitree', tags=['wikitree'])
 # Helper Functions
 
 
-def get_user_id(user: User) -> UUID:
-    """Extract UUID from User model.
+def get_user_id(user: User) -> str:
+    """Extract user ID from User model.
 
     Args:
         user: User model with userid string
 
     Returns:
-        UUID representation of user ID
-
-    Raises:
-        ValueError: If userid is not a valid UUID
+        User ID as string (Google subject ID)
     """
-    return UUID(user.userid)
+    return user.userid
 
 
 # Request/Response Models
@@ -245,8 +242,8 @@ async def handle_callback(
 
         return WikiTreeConnectionStatus(
             is_connected=True,
-            wikitree_user_id=connection.wikitree_user_key,
-            wikitree_user_name=wikitree_user_name,
+            wikitree_user_id=int(connection.wikitree_user_key) if connection.wikitree_user_key else None,
+            wikitree_user_name=connection.session_ref,
             connected_at=(
                 connection.connected_at.isoformat()
                 if connection.connected_at
@@ -264,7 +261,7 @@ async def handle_callback(
             ),
         )
 
-    except ValueError as e:
+    except (ValueError, WikiTreeAPIError) as e:
         logger.warning(
             'WikiTree authcode validation failed',
             extra={'user_id': str(get_user_id(current_user)), 'error': str(e)},
@@ -391,11 +388,8 @@ async def get_connection_status(
             )
             # Don't fail the request, just return cached status
 
-    # Extract user_name from session_ref if available (stored as JSON)
-    wikitree_user_name = None
-    if connection.session_ref:
-        # session_ref might contain user_name in future implementation
-        pass
+    # Extract user_name from session_ref
+    wikitree_user_name = connection.session_ref if connection.session_ref else None
 
     return WikiTreeConnectionStatus(
         is_connected=is_connected,
@@ -506,6 +500,35 @@ async def get_profile(
             data=profile_data,
         )
 
+    except WikiTreeAPIError as e:
+        # Profile-specific errors (status != 0) are treated as not found
+        if "Profile retrieval failed" in str(e):
+            logger.warning(
+                'WikiTree profile not found',
+                extra={
+                    'user_id': str(get_user_id(current_user)),
+                    'wikitree_id': wikitree_id,
+                    'error': str(e),
+                },
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f'Profile not found: {e}',
+            ) from e
+        else:
+            # Generic API errors (connection, HTTP, etc.) are server errors
+            logger.error(
+                'Failed to fetch WikiTree profile',
+                extra={
+                    'user_id': str(get_user_id(current_user)),
+                    'wikitree_id': wikitree_id,
+                },
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Failed to fetch WikiTree profile: {e}',
+            ) from e
     except ValueError as e:
         logger.warning(
             'WikiTree profile not found',

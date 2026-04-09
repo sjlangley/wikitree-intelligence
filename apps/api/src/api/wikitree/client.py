@@ -113,19 +113,28 @@ class WikiTreeClient:
             response.raise_for_status()
             data = response.json()
 
+            logger.debug(
+                f"WikiTree authcode validation response: {data}"
+            )
+
             client_login = data.get("clientLogin", {})
             result = client_login.get("result")
 
-            if result == "success":
+            logger.debug(
+                f"WikiTree validation result: {result}, client_login keys: {list(client_login.keys())}"
+            )
+
+            if result and result.lower() == "success":
                 return {
-                    "user_id": client_login.get("user_id"),
-                    "user_name": client_login.get("user_name"),
-                    "wikitree_id": client_login.get("user_name"),  # WikiTree ID
+                    "user_id": str(client_login.get("userid")),
+                    "user_name": client_login.get("username"),
+                    "wikitree_id": client_login.get("username"),  # WikiTree ID
                 }
             else:
                 error_msg = client_login.get("error", "Unknown error")
                 logger.error(
-                    f"WikiTree authcode validation failed: {error_msg}"
+                    f"WikiTree authcode validation failed: {error_msg}, "
+                    f"result={result}, full_response={data}"
                 )
                 raise WikiTreeAPIError(
                     f"Authcode validation failed: {error_msg}"
@@ -166,7 +175,7 @@ class WikiTreeClient:
             client_login = data.get("clientLogin", {})
             result = client_login.get("result")
 
-            return result == "ok"
+            return result and result.lower() == "ok"
 
         except (httpx.HTTPError, KeyError, ValueError) as e:
             logger.warning(f"Error checking login status: {e}")

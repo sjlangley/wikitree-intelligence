@@ -2,7 +2,6 @@
 
 from datetime import datetime, timedelta
 import logging
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +27,7 @@ class WikiTreeSessionManager:
 
     async def create_connection(
         self,
-        user_id: UUID,
+        user_id: str,
         wikitree_user_id: int,
         wikitree_user_name: str,
     ) -> WikiTreeConnection:
@@ -80,7 +79,7 @@ class WikiTreeSessionManager:
         return connection
 
     async def get_connection(
-        self, user_id: UUID
+        self, user_id: str
     ) -> WikiTreeConnection | None:
         """Get WikiTree connection for a user.
 
@@ -96,7 +95,7 @@ class WikiTreeSessionManager:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def disconnect(self, user_id: UUID) -> None:
+    async def disconnect(self, user_id: str) -> None:
         """Disconnect WikiTree connection for a user.
 
         Args:
@@ -109,7 +108,7 @@ class WikiTreeSessionManager:
             await self.db.commit()
             logger.info(f"Disconnected WikiTree for user {user_id}")
 
-    async def mark_expired(self, user_id: UUID) -> None:
+    async def mark_expired(self, user_id: str) -> None:
         """Mark WikiTree connection as expired.
 
         Args:
@@ -124,7 +123,7 @@ class WikiTreeSessionManager:
             )
 
     async def verify_and_update(
-        self, user_id: UUID, is_valid: bool
+        self, user_id: str, is_valid: bool
     ) -> None:
         """Update connection verification status.
 
