@@ -88,9 +88,9 @@ claim_next_job(worker_id: str) -> ImportJob | None:
 
 **Stale job recovery:** If heartbeat hasn't updated in 5 minutes, job is reclaimed by another worker
 
-## Files to Create/Modify (9 files)
+## Files to Create/Modify (10 files)
 
-### Backend (6 files)
+### Backend API (5 files)
 
 1. **`apps/api/src/api/routes/import_jobs.py`** (NEW)
    - `POST /import-jobs` - Create job from uploaded GEDCOM
@@ -118,46 +118,52 @@ claim_next_job(worker_id: str) -> ImportJob | None:
    - `review_stage(job_id, batch_size)` - Stub: log progress
    - Each returns: `{records_processed: int, stage_complete: bool, checkpoint_data: dict}`
 
-4. **`apps/api/src/api/worker.py`** (NEW)
-   - Main worker loop (run via `python -m api.worker`)
+4. **`apps/api/src/api/app.py`** (MODIFY)
+   - Register import_jobs router
+   - Add startup check for `/data/gedcom` directory existence
+
+5. **`apps/api/src/api/database.py`** (MODIFY)
+   - Add file storage helper: `get_gedcom_storage_path(user_id, job_id)`
+
+### Worker Process (2 files)
+
+6. **`apps/worker/main.py`** (NEW)
+   - Main worker loop (run via `python -m worker.main`)
    - Polls for jobs every 5 seconds
    - Claims job, runs batches, commits checkpoints
    - Graceful shutdown on SIGTERM/SIGINT
    - Logging for observability
+   - Imports from `api.services.import_pipeline` and `api.database`
 
-5. **`apps/api/src/api/app.py`** (MODIFY)
-   - Register import_jobs router
-   - Add startup check for `/data/gedcom` directory existence
-
-6. **`apps/api/src/api/database.py`** (MODIFY)
-   - Add file storage helper: `get_gedcom_storage_path(user_id, job_id)`
+7. **`apps/worker/__init__.py`** (NEW)
+   - Makes worker a proper Python package
 
 ### Frontend (2 files)
 
-7. **`apps/ui/src/components/ImportJobPage.tsx`** (NEW)
+8. **`apps/ui/src/components/ImportJobPage.tsx`** (NEW)
    - Job list view with status badges
    - Upload GEDCOM form
    - Job detail view with stage progress bars
    - Pause/resume/cancel actions
    - Auto-refresh every 2 seconds while job is running
 
-8. **`apps/ui/src/components/ImportJobCard.tsx`** (NEW)
+9. **`apps/ui/src/components/ImportJobCard.tsx`** (NEW)
    - Single job summary card
    - Progress visualization (overall + per-stage)
    - Status badge (pending/running/paused/completed/failed)
    - Action buttons (pause/resume/cancel/view)
 
-### Tests (1 file modified)
+### Tests (1 file)
 
-9. **`apps/api/tests/test_import_pipeline.py`** (NEW)
-   - Test job creation with file upload
-   - Test lease claiming (no double-claim race)
-   - Test heartbeat refresh
-   - Test stale job reclaim after timeout
-   - Test stage transitions
-   - Test batch processing with checkpoints
-   - Test pause/resume
-   - Test job failure and error capture
+10. **`apps/api/tests/test_import_pipeline.py`** (NEW)
+    - Test job creation with file upload
+    - Test lease claiming (no double-claim race)
+    - Test heartbeat refresh
+    - Test stale job reclaim after timeout
+    - Test stage transitions
+    - Test batch processing with checkpoints
+    - Test pause/resume
+    - Test job failure and error capture
 
 ## API Endpoints
 
@@ -303,10 +309,23 @@ Already exist in PR2 schema. No new tables needed.
 ### Main Loop
 
 ```python
-# apps/api/src/api/worker.py
+# apps/worker/main.py
 import asyncio
+import os
 import signal
-from api.services.import_pipeline import claim_next_job, heartbeat_job, run_stage_batch
+import socket
+import sys
+import time
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from api.services.import_pipeline import claim_next_job, heartbeat_job, run_stage_batch, fail_job
+from api.database import init_db
+import logging
+
+logger = logging.getLogger(__name__)
 
 WORKER_ID = os.getenv("WORKER_ID", f"worker-{socket.gethostname()}-{os.getpid()}")
 POLL_INTERVAL = 5  # seconds
@@ -324,6 +343,9 @@ signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 async def main():
+    # Initialize database connection
+    await init_db()
+    
     logger.info(f"Worker {WORKER_ID} starting...")
     
     while not shutdown_flag:
@@ -598,7 +620,7 @@ STAGE_RUNNERS = {
 - [ ] UI auto-refreshes while job is running
 - [ ] All tests pass (backend + frontend)
 - [ ] Backend coverage ≥ 80%
-- [ ] Worker runs as separate process via `python -m api.worker`
+- [ ] Worker runs as separate process via `python -m worker.main`
 
 ## Future Enhanced in Later PRs
 
@@ -613,8 +635,8 @@ This PR establishes infrastructure only. Later PRs will:
 
 - **Why stubs?** Lets us test the worker pattern, checkpointing, and job lifecycle without implementing complex parsing/matching logic first. Each stub simulates realistic batch processing.
 
-- **Why 9 files?** Stays under the 10-file limit. Groups related logic (routes, services, UI components) together.
+- **Why 10 files?** At the limit but necessary. Worker is a separate process (`apps/worker/`) not part of API. Groups related logic appropriately.
 
 - **Why no dump integration?** PR5 deferred until WikiTree dump access available. Search/match stubs will work without it.
 
-- **Worker deployment:** For local dev, run `docker compose up` will start worker container. For production, scale horizontally with multiple worker pods.
+- **Worker deployment:** Separate `apps/worker/` directory with its own entry point. Docker compose starts worker container. For production, scale horizontally with multiple worker pods. Worker imports from `api` package for shared models/services.
