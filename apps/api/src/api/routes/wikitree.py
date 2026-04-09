@@ -344,13 +344,10 @@ async def get_connection_status(
     session_mgr: Annotated[
         WikiTreeSessionManager, Depends(get_session_manager)
     ],
+    client: Annotated[WikiTreeClient, Depends(get_wikitree_client)],
     verify: Annotated[
         bool, Query(description='Verify connection with WikiTree')
     ] = False,
-    client: Annotated[
-        WikiTreeClient, Depends(get_wikitree_client)
-    ]
-    | None = None,
 ) -> WikiTreeConnectionStatus:
     """Get current WikiTree connection status.
 
@@ -369,7 +366,7 @@ async def get_connection_status(
     is_connected = session_mgr.is_connected(connection)
 
     # Optionally verify with WikiTree API
-    if verify and is_connected and client and connection.wikitree_user_key:
+    if verify and is_connected and connection.wikitree_user_key:
         try:
             # Convert wikitree_user_key to int for API call
             is_still_valid = await client.check_login_status(

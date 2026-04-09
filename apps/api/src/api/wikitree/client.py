@@ -62,6 +62,7 @@ class WikiTreeClient:
         params = {
             "action": "clientLogin",
             "returnURL": return_url,
+            "appId": self.app_id,
         }
         return f"{WIKITREE_API_URL}?{urlencode(params)}"
 
@@ -78,6 +79,7 @@ class WikiTreeClient:
             "action": "clientLogin",
             "doLogout": "1",
             "returnURL": return_url,
+            "appId": self.app_id,
         }
         return f"{WIKITREE_API_URL}?{urlencode(params)}"
 
