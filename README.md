@@ -34,6 +34,15 @@ This repo is in active development.
 - 52 passing state machine tests with 100% state_machines.py coverage
 - Coverage: 81.84% backend (meets 80% requirement)
 
+✅ **WikiTree OAuth Integration** (PR #30, merged 2026-04-09)
+- WikiTree API client with async httpx for login/logout/profile operations
+- Session manager for WikiTree connection state with 30-day expiry tracking
+- REST API routes: connect/initiate, callback, disconnect, status, profile retrieval
+- Browser-based OAuth-like flow with backend-owned session mapping
+- Security: open redirect prevention, backend-only WikiTree user_id storage
+- UI: WikiTree settings page with connect/disconnect flow
+- Coverage: 114 backend tests (92.24%), 44 frontend tests (100% passing)
+
 ### In Progress
 
 Planning and architecture documentation:

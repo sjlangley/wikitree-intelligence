@@ -43,6 +43,7 @@ apps/ui/
 │   ├── components/      # Reusable React components
 │   ├── pages/          # Top-level page components
 │   ├── hooks/          # Custom React hooks
+│   ├── lib/            # Shared utilities and API clients
 │   ├── utils/          # Pure utility functions
 │   ├── types/          # TypeScript type definitions
 │   ├── assets/         # Images, icons, fonts
@@ -459,6 +460,9 @@ apps/api/
 ├── src/
 │   └── api/
 │       ├── routes/          # API route handlers
+│       ├── wikitree/        # WikiTree integration
+│       │   ├── client.py    # WikiTree API client
+│       │   └── session.py   # WikiTree session manager
 │       ├── models/          # Pydantic models
 │       ├── services/        # Business logic
 │       ├── utils/           # Helper functions
@@ -468,6 +472,7 @@ apps/api/
 │       └── app.py           # FastAPI application
 └── tests/
     ├── conftest.py          # Shared fixtures
+    ├── wikitree/            # WikiTree integration tests
     └── test_*.py            # Test modules
 ```
 
