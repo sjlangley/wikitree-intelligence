@@ -70,7 +70,7 @@ class TestWikiTreeRoutes:
         """Test POST /api/wikitree/connect/initiate."""
         response = await authenticated_async_test_client.post(
             '/api/wikitree/connect/initiate',
-            json={'return_url': 'https://example.com/callback'},
+            json={'return_url': '/wikitree/callback'},
         )
 
         assert response.status_code == 200
@@ -79,8 +79,21 @@ class TestWikiTreeRoutes:
         assert 'https://api.wikitree.com/api.php' in data['login_url']
         assert 'action=clientLogin' in data['login_url']
         mock_wikitree_client.get_login_url.assert_called_once_with(
-            'https://example.com/callback'
+            '/wikitree/callback'
         )
+
+    @pytest.mark.asyncio
+    async def test_initiate_connection_absolute_url_rejected(
+        self, authenticated_async_test_client, override_wikitree_dependencies
+    ):
+        """Test POST /api/wikitree/connect/initiate rejects absolute URLs."""
+        response = await authenticated_async_test_client.post(
+            '/api/wikitree/connect/initiate',
+            json={'return_url': 'https://evil.com/callback'},
+        )
+
+        assert response.status_code == 400
+        assert 'relative path' in response.json()['detail']
 
     @pytest.mark.asyncio
     async def test_initiate_connection_missing_return_url(

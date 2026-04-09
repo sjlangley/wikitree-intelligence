@@ -117,10 +117,12 @@ describe('WikiTreeSettingsPage', () => {
     await user.click(connectButton);
 
     await waitFor(() => {
+      // Check that initiate was called (second call after initial status fetch)
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/wikitree/connect/initiate',
+        expect.stringContaining('/api/wikitree/connect/initiate'),
         expect.objectContaining({
           method: 'POST',
+          credentials: 'include',
         })
       );
     });
@@ -169,9 +171,14 @@ describe('WikiTreeSettingsPage', () => {
     await user.click(disconnectButton);
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/wikitree/disconnect', {
-        method: 'POST',
-      });
+      // Check that disconnect was called
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/wikitree/disconnect'),
+        expect.objectContaining({
+          method: 'POST',
+          credentials: 'include',
+        })
+      );
     });
   });
 
