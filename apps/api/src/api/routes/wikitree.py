@@ -5,8 +5,8 @@ Endpoints for managing WikiTree authentication and profile access.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncGenerator
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -200,7 +200,8 @@ async def handle_callback(
     in the database if successful.
     """
     logger.info(
-        'Handling WikiTree callback', extra={'user_id': str(get_user_id(current_user))}
+        'Handling WikiTree callback',
+        extra={'user_id': str(get_user_id(current_user))},
     )
 
     if not request.authcode:
@@ -242,7 +243,11 @@ async def handle_callback(
 
         return WikiTreeConnectionStatus(
             is_connected=True,
-            wikitree_user_id=int(connection.wikitree_user_key) if connection.wikitree_user_key else None,
+            wikitree_user_id=(
+                int(connection.wikitree_user_key)
+                if connection.wikitree_user_key
+                else None
+            ),
             wikitree_user_name=connection.session_ref,
             connected_at=(
                 connection.connected_at.isoformat()
@@ -308,7 +313,8 @@ async def disconnect(
     but this app will no longer use them.
     """
     logger.info(
-        'Disconnecting WikiTree', extra={'user_id': str(get_user_id(current_user))}
+        'Disconnecting WikiTree',
+        extra={'user_id': str(get_user_id(current_user))},
     )
 
     connection = await session_mgr.get_connection(get_user_id(current_user))
@@ -389,7 +395,9 @@ async def get_connection_status(
             # Don't fail the request, just return cached status
 
     # Extract user_name from session_ref
-    wikitree_user_name = connection.session_ref if connection.session_ref else None
+    wikitree_user_name = (
+        connection.session_ref if connection.session_ref else None
+    )
 
     return WikiTreeConnectionStatus(
         is_connected=is_connected,
@@ -456,7 +464,10 @@ async def get_profile(
     """
     logger.info(
         'Fetching WikiTree profile',
-        extra={'user_id': str(get_user_id(current_user)), 'wikitree_id': wikitree_id},
+        extra={
+            'user_id': str(get_user_id(current_user)),
+            'wikitree_id': wikitree_id,
+        },
     )
 
     # Check if user has active WikiTree connection

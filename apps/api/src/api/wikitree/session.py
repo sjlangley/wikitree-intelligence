@@ -85,12 +85,14 @@ class WikiTreeSessionManager:
                 await self.db.rollback()
                 if attempt == 2:
                     logger.error(
-                        f"Failed to create connection after 3 attempts: {user_id}"
+                        f"Failed to create connection after 3 attempts: "
+                        f"{user_id}"
                     )
                     raise
                 # Concurrent create detected, retry to fetch and update
                 logger.debug(
-                    f"Concurrent connection create detected for {user_id}, retrying"
+                    f"Concurrent connection create detected for {user_id}, "
+                    f"retrying"
                 )
                 continue
 

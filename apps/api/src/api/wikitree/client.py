@@ -121,7 +121,8 @@ class WikiTreeClient:
             result = client_login.get("result")
 
             logger.debug(
-                f"WikiTree validation result: {result}, client_login keys: {list(client_login.keys())}"
+                f"WikiTree validation result: {result}, "
+                f"client_login keys: {list(client_login.keys())}"
             )
 
             if result and result.lower() == "success":
