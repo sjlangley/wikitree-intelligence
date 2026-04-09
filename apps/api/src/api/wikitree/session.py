@@ -57,25 +57,25 @@ class WikiTreeSessionManager:
             if connection:
                 # Update existing connection
                 connection.wikitree_user_key = str(wikitree_user_id)
-                connection.status = "connected"
+                connection.status = 'connected'
                 connection.session_ref = wikitree_user_name
                 connection.connected_at = now
                 connection.expires_at = expires_at
                 connection.last_verified_at = now
-                logger.info(f"Updated WikiTree connection for user {user_id}")
+                logger.info(f'Updated WikiTree connection for user {user_id}')
             else:
                 # Create new connection
                 connection = WikiTreeConnection(
                     user_id=user_id,
                     wikitree_user_key=str(wikitree_user_id),
-                    status="connected",
+                    status='connected',
                     session_ref=wikitree_user_name,
                     connected_at=now,
                     expires_at=expires_at,
                     last_verified_at=now,
                 )
                 self.db.add(connection)
-                logger.info(f"Created WikiTree connection for user {user_id}")
+                logger.info(f'Created WikiTree connection for user {user_id}')
 
             try:
                 await self.db.commit()
@@ -85,23 +85,21 @@ class WikiTreeSessionManager:
                 await self.db.rollback()
                 if attempt == 2:
                     logger.error(
-                        f"Failed to create connection after 3 attempts: "
-                        f"{user_id}"
+                        f'Failed to create connection after 3 attempts: '
+                        f'{user_id}'
                     )
                     raise
                 # Concurrent create detected, retry to fetch and update
                 logger.debug(
-                    f"Concurrent connection create detected for {user_id}, "
-                    f"retrying"
+                    f'Concurrent connection create detected for {user_id}, '
+                    f'retrying'
                 )
                 continue
 
         # Should never reach here due to raise in loop
-        raise RuntimeError("Unexpected state in create_connection")
+        raise RuntimeError('Unexpected state in create_connection')
 
-    async def get_connection(
-        self, user_id: str
-    ) -> WikiTreeConnection | None:
+    async def get_connection(self, user_id: str) -> WikiTreeConnection | None:
         """Get WikiTree connection for a user.
 
         Args:
@@ -124,10 +122,10 @@ class WikiTreeSessionManager:
         """
         connection = await self.get_connection(user_id)
         if connection:
-            connection.status = "disconnected"
+            connection.status = 'disconnected'
             connection.session_ref = None
             await self.db.commit()
-            logger.info(f"Disconnected WikiTree for user {user_id}")
+            logger.info(f'Disconnected WikiTree for user {user_id}')
 
     async def mark_expired(self, user_id: str) -> None:
         """Mark WikiTree connection as expired.
@@ -137,15 +135,13 @@ class WikiTreeSessionManager:
         """
         connection = await self.get_connection(user_id)
         if connection:
-            connection.status = "expired"
+            connection.status = 'expired'
             await self.db.commit()
             logger.info(
-                f"Marked WikiTree connection expired for user {user_id}"
+                f'Marked WikiTree connection expired for user {user_id}'
             )
 
-    async def verify_and_update(
-        self, user_id: str, is_valid: bool
-    ) -> None:
+    async def verify_and_update(self, user_id: str, is_valid: bool) -> None:
         """Update connection verification status.
 
         Args:
@@ -156,7 +152,7 @@ class WikiTreeSessionManager:
         if connection:
             connection.last_verified_at = datetime.utcnow()
             if not is_valid:
-                connection.status = "expired"
+                connection.status = 'expired'
             await self.db.commit()
 
     def is_connected(self, connection: WikiTreeConnection | None) -> bool:
@@ -171,7 +167,7 @@ class WikiTreeSessionManager:
         if not connection:
             return False
 
-        if connection.status != "connected":
+        if connection.status != 'connected':
             return False
 
         # Check expiration

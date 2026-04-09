@@ -3,7 +3,7 @@
  * Manages WikiTree authentication and connection status
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface WikiTreeConnectionStatus {
   is_connected: boolean;
@@ -42,7 +42,7 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [handleCallback]);
 
   async function fetchStatus() {
     try {
@@ -94,36 +94,39 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
     }
   }
 
-  async function handleCallback(authcode: string) {
-    try {
-      setLoading(true);
-      setError(null);
+  const handleCallback = useCallback(
+    async (authcode: string) => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const response = await fetch(`${API_BASE}/connect/callback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ authcode }),
-      });
+        const response = await fetch(`${API_BASE}/connect/callback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ authcode }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to connect');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to connect');
+        }
+
+        const data = await response.json();
+        setStatus(data);
+        // Notify parent component of status change
+        if (onStatusChange) {
+          onStatusChange();
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Connection failed');
+      } finally {
+        setLoading(false);
       }
-
-      const data = await response.json();
-      setStatus(data);
-      // Notify parent component of status change
-      if (onStatusChange) {
-        onStatusChange();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection failed');
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [onStatusChange]
+  );
 
   async function handleDisconnect() {
     if (!confirm('Are you sure you want to disconnect from WikiTree?')) {

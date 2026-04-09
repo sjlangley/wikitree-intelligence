@@ -79,9 +79,7 @@ class WikiTreeConnectionStatus(BaseModel):
     connected_at: str | None = Field(
         None, description='When connection was established'
     )
-    expires_at: str | None = Field(
-        None, description='When connection expires'
-    )
+    expires_at: str | None = Field(None, description='When connection expires')
     last_verified_at: str | None = Field(
         None, description='Last time connection was verified'
     )
@@ -119,7 +117,7 @@ async def get_wikitree_client() -> AsyncGenerator[WikiTreeClient, None]:
 
 
 async def get_session_manager(
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> WikiTreeSessionManager:
     """Get WikiTree session manager."""
     return WikiTreeSessionManager(db)
@@ -411,9 +409,7 @@ async def get_connection_status(
             else None
         ),
         expires_at=(
-            connection.expires_at.isoformat()
-            if connection.expires_at
-            else None
+            connection.expires_at.isoformat() if connection.expires_at else None
         ),
         last_verified_at=(
             connection.last_verified_at.isoformat()
@@ -432,8 +428,7 @@ async def get_connection_status(
         401: {'description': 'Not authenticated', 'model': ErrorResponse},
         403: {
             'description': (
-                'Not connected to WikiTree or no access to private '
-                'profile'
+                'Not connected to WikiTree or no access to private profile'
             ),
             'model': ErrorResponse,
         },
@@ -486,9 +481,7 @@ async def get_profile(
 
     try:
         # Parse fields if provided
-        field_list = (
-            [f.strip() for f in fields.split(',')] if fields else None
-        )
+        field_list = [f.strip() for f in fields.split(',')] if fields else None
 
         # Fetch profile from WikiTree
         profile_data = await client.get_profile(wikitree_id, fields=field_list)
@@ -513,7 +506,7 @@ async def get_profile(
 
     except WikiTreeAPIError as e:
         # Profile-specific errors (status != 0) are treated as not found
-        if "Profile retrieval failed" in str(e):
+        if 'Profile retrieval failed' in str(e):
             logger.warning(
                 'WikiTree profile not found',
                 extra={
