@@ -17,12 +17,22 @@ This repo is in active development.
 
 ### Completed
 
-✅ **Google Authentication And App Session Boundary**
+✅ **Google Authentication And App Session Boundary** (PR #10, merged 2026-04-08)
 - Frontend: React `AuthProvider` restores auth state on app load
 - Backend: FastAPI login/logout/current-user endpoints are live
 - Session cookies: Starlette `SessionMiddleware` persists app session state
 - User flow: Google sign-in, returning-session restore, and logout all work
 - Coverage: UI 20 tests, API 16 tests with 93.66% backend coverage
+
+✅ **Database Spine with SQLModel Tables and State Machines** (PR #12, merged 2026-04-09)
+- SQLModel table definitions for all 15 minimum v1 tables (single source of truth)
+- StrEnum-based state machines: ImportJobStatus (7 states), ImportJobStageStatus (5 states), MatchReviewStatus (5 states)
+- Explicit transition validation functions with terminal state detection
+- Async database engine initialization with auto table creation
+- Database-level enum constraints for state validation
+- Type-safe status fields for Pydantic validation at API layer
+- 52 passing state machine tests with 100% state_machines.py coverage
+- Coverage: 81.84% backend (meets 80% requirement)
 
 ### In Progress
 
