@@ -6,6 +6,7 @@ Endpoints for managing WikiTree authentication and profile access.
 from collections.abc import AsyncGenerator
 import logging
 from typing import Annotated
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -35,6 +36,28 @@ def get_user_id(user: User) -> str:
         User ID as string (Google subject ID)
     """
     return user.userid
+
+
+def validate_return_url(return_url: str) -> None:
+    """Validate return_url to prevent open redirect vulnerabilities.
+
+    Args:
+        return_url: The URL to validate
+
+    Raises:
+        HTTPException: If URL is not safe (absolute URL or suspicious)
+    """
+    parsed = urlparse(return_url)
+    
+    # Allow only relative paths (no scheme/netloc)
+    if parsed.scheme or parsed.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                'return_url must be a relative path '
+                '(e.g., /wikitree/callback)'
+            ),
+        )
 
 
 # Request/Response Models
@@ -155,6 +178,9 @@ async def initiate_connection(
             detail='return_url is required',
         )
 
+    # Validate return_url to prevent open redirect attacks
+    validate_return_url(request.return_url)
+
     login_url = client.get_login_url(request.return_url)
 
     logger.debug(
@@ -210,7 +236,14 @@ async def handle_callback(
         # Validate authcode and get user info
         user_info = await client.validate_authcode(request.authcode)
 
-        wikitree_user_id = user_info['user_id']
+        # Convert string user_id to int (fail fast if not numeric)
+        try:
+            wikitree_user_id = int(user_info['user_id'])
+        except (ValueError, TypeError) as e:
+            raise WikiTreeAPIError(
+                f'Invalid WikiTree user_id format: {user_info["user_id"]}'
+            ) from e
+        
         wikitree_user_name = user_info['user_name']
 
         logger.info(
@@ -262,7 +295,8 @@ async def handle_callback(
             ),
         )
 
-    except (ValueError, WikiTreeAPIError) as e:
+    except WikiTreeAPIError as e:
+        # WikiTree API errors (invalid authcode, bad response)
         logger.warning(
             'WikiTree authcode validation failed',
             extra={'user_id': str(get_user_id(current_user)), 'error': str(e)},
@@ -270,6 +304,17 @@ async def handle_callback(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f'Invalid or expired authcode: {e}',
+        ) from e
+    except httpx.HTTPError as e:
+        # Network/transport errors - server-side issue
+        logger.error(
+            'HTTP error during WikiTree connection',
+            extra={'user_id': str(get_user_id(current_user))},
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail='Failed to communicate with WikiTree API',
         ) from e
     except Exception as e:
         logger.error(
@@ -300,7 +345,6 @@ async def disconnect(
     session_mgr: Annotated[
         WikiTreeSessionManager, Depends(get_session_manager)
     ],
-    client: Annotated[WikiTreeClient, Depends(get_wikitree_client)],
 ) -> None:
     """Disconnect WikiTree connection.
 
@@ -395,11 +439,21 @@ async def get_connection_status(
         connection.session_ref if connection.session_ref else None
     )
 
+    # Explicitly cast wikitree_user_key to int
+    wikitree_user_id = None
+    if is_connected and connection.wikitree_user_key:
+        try:
+            wikitree_user_id = int(connection.wikitree_user_key)
+        except (TypeError, ValueError):
+            logger.warning(
+                'Invalid wikitree_user_key format',
+                extra={'user_id': str(get_user_id(current_user))},
+            )
+            wikitree_user_id = None
+
     return WikiTreeConnectionStatus(
         is_connected=is_connected,
-        wikitree_user_id=(
-            connection.wikitree_user_key if is_connected else None
-        ),
+        wikitree_user_id=wikitree_user_id,
         wikitree_user_name=wikitree_user_name,
         connected_at=(
             connection.connected_at.isoformat()

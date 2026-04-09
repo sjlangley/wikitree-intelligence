@@ -42,7 +42,7 @@ class WikiTreeSessionManager:
         """Create or update WikiTree connection for a user.
 
         Args:
-            user_id: App user UUID
+            user_id: Google subject ID (string)
             wikitree_user_id: WikiTree user ID (integer)
             wikitree_user_name: WikiTree user name (WikiTree ID)
 
@@ -111,7 +111,7 @@ class WikiTreeSessionManager:
         """Get WikiTree connection for a user.
 
         Args:
-            user_id: App user UUID
+            user_id: Google subject ID (string)
 
         Returns:
             WikiTreeConnection or None if not found
@@ -126,7 +126,7 @@ class WikiTreeSessionManager:
         """Disconnect WikiTree connection for a user.
 
         Args:
-            user_id: App user UUID
+            user_id: Google subject ID (string)
         """
         connection = await self.get_connection(user_id)
         if connection:
@@ -139,7 +139,7 @@ class WikiTreeSessionManager:
         """Mark WikiTree connection as expired.
 
         Args:
-            user_id: App user UUID
+            user_id: Google subject ID (string)
         """
         connection = await self.get_connection(user_id)
         if connection:
@@ -153,7 +153,7 @@ class WikiTreeSessionManager:
         """Update connection verification status.
 
         Args:
-            user_id: App user UUID
+            user_id: Google subject ID (string)
             is_valid: Whether session is still valid
         """
         connection = await self.get_connection(user_id)

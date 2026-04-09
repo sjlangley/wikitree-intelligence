@@ -224,7 +224,12 @@ class WikiTreeClient:
                 if profile_data.get('status') == 0:
                     return profile_data
                 else:
-                    error_msg = profile_data.get('status', 'Unknown error')
+                    # Prefer 'error' field for actionable message
+                    error_msg = (
+                        profile_data.get('error')
+                        or profile_data.get('status')
+                        or 'Unknown error'
+                    )
                     raise WikiTreeAPIError(
                         f'Profile retrieval failed: {error_msg}'
                     )
