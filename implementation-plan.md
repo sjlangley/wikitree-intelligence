@@ -184,17 +184,28 @@ Acceptance:
 - CI passes
 - backend and frontend coverage gates are both set to 80%
 
-### PR2: Database Spine + Explicit State Machines
+### PR2: Database Spine + Explicit State Machines ✅ COMPLETE
+
+**Status:** Merged in PR #12 on 2026-04-09
+
+**Implemented:**
+- SQLModel table definitions for all 15 minimum v1 tables
+- StrEnum-based state machines with explicit transition validation
+- Database initialization in async lifespan context
+- 52 passing state machine tests with 100% coverage
+- Database-level enum constraints for state validation
+- Type-safe status fields (ImportJobStatus, ImportJobStageStatus, MatchReviewStatus)
+- Proper SQLAlchemy Date type for date fields
+- Password redaction in database URL logging
 
 Purpose:
 Introduce the canonical persistence model and job/review state enums before feature code.
 
 Files:
-- `migrations/001_initial_schema.sql`
-- `apps/api/db.py`
-- `apps/api/models.py`
-- `apps/api/state_machines.py`
-- `apps/api/tests/test_models.py`
+- `apps/api/src/api/database.py`
+- `apps/api/src/api/state_machines.py`
+- `apps/api/src/api/app.py` (database lifespan)
+- `apps/api/src/api/settings.py` (database config)
 - `apps/api/tests/test_import_job_states.py`
 - `apps/api/tests/test_review_record_states.py`
 

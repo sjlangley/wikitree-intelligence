@@ -1,19 +1,130 @@
 """Entrypoint for the API application."""
 
+from contextlib import asynccontextmanager
 import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.engine.url import URL, make_url
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel import SQLModel
 from starlette.middleware.sessions import SessionMiddleware
 
+import api.database  # noqa: F401 - Import to register models with SQLModel metadata
 from api.enums import Environment
+from api.logging import setup_logging
 from api.routes import auth, health, user
-from api.settings import settings
+from api.settings import Settings, settings
 
 logger = logging.getLogger(__name__)
 
 
-app = FastAPI()
+def _get_safe_settings_for_logging(settings_to_log: Settings) -> dict:
+    """Get settings with sensitive values redacted for logging.
+
+    Args:
+        settings_to_log: The application settings.
+
+
+    Returns:
+        Dictionary of settings with sensitive values masked.
+    """
+    # Fields that should never be logged
+    sensitive_fields = {
+        'client_id',
+        'session_secret_key',
+        'database_password',
+        'database_url',
+    }
+
+    data = settings_to_log.model_dump()
+    safe_data = {}
+
+    for key, value in data.items():
+        if key in sensitive_fields:
+            safe_data[key] = '***REDACTED***'
+        else:
+            safe_data[key] = value
+
+    return safe_data
+
+
+def _log_startup_settings(settings_to_log: Settings) -> None:
+    """Log application settings at startup for debugging.
+
+    Args:
+        settings_to_log: The application settings to log.
+    """
+    safe_settings = _get_safe_settings_for_logging(settings_to_log)
+    logger.info(
+        'Application startup configuration: %s',
+        safe_settings,
+    )
+
+
+def tcp_connection_url() -> URL:
+    """Initializes a TCP connection URL for a Cloud SQL instance of PostgreSQL.
+
+    Returns:
+        URL: The SQLAlchemy URL object configured for TCP connection.
+    """
+    db_user = settings.database_user
+    db_pass = settings.database_password
+    db_name = settings.database_name
+    db_host = settings.database_host
+    db_port = settings.database_port
+
+    return URL.create(
+        drivername='postgresql+asyncpg',
+        username=db_user,
+        password=db_pass,
+        host=db_host,
+        port=db_port,
+        database=db_name,
+    )
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    setup_logging()
+    _log_startup_settings(settings)
+
+    # Connect to the database
+    if settings.database_url is not None:
+        database_url = settings.database_url
+    else:
+        database_url = tcp_connection_url()
+
+    # Redact password from database URL for logging
+    # Use SQLAlchemy's built-in method to safely hide credentials
+    if isinstance(database_url, str):
+        safe_url = make_url(database_url).render_as_string(hide_password=True)
+    else:
+        safe_url = database_url.render_as_string(hide_password=True)
+    logger.info(f'Final Database URL: {safe_url}')
+
+    application.state.engine = create_async_engine(
+        database_url, pool_pre_ping=True
+    )
+
+    async with application.state.engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+    logger.info(f'Engine URL after parsing: {application.state.engine.url!r}')
+    logger.info(
+        f'Engine URL components -> dialect='
+        f'{application.state.engine.url.get_dialect().name}, '
+        f'driver={application.state.engine.url.get_driver_name()}'
+    )
+
+    yield
+
+    engine = getattr(application.state, 'engine', None)
+    if engine is not None:
+        await engine.dispose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Configure CORS
 if settings.client_origins:
