@@ -280,20 +280,33 @@ Acceptance:
 - complete in current repo, using signed session cookies rather than a database-backed
   session store
 
-### PR4: WikiTree Connection Boundary
+### PR4: WikiTree Connection Boundary ✅ COMPLETE
+
+**Status:** Merged in PR #30 on 2026-04-09
+
+**Implemented:**
+- Async WikiTree API client (`wikitree/client.py`) with httpx for all WikiTree API operations
+- WikiTree session manager (`wikitree/session.py`) for database-backed connection state
+- REST API routes (`routes/wikitree.py`): connect/initiate, callback, disconnect, status, profile
+- Browser-based OAuth-like flow with backend-owned WikiTree user_id mapping
+- Security: return_url validation (prevents open redirect), backend-only session storage
+- WikiTree settings page UI component with connection status and connect/disconnect actions
+- 114 backend tests (92.24% coverage), 44 frontend tests
+- Shared API client utility for all frontend-to-backend communication
 
 Purpose:
 Add WikiTree authentication and backend-owned private-data access.
 
 Files:
-- `apps/api/wikitree_client.py`
-- `apps/api/wikitree_session.py`
-- `apps/api/routes_wikitree.py`
-- `apps/api/models.py`
-- `apps/api/tests/test_wikitree_auth.py`
-- `apps/api/tests/test_wikitree_private_access.py`
-- `apps/ui/src/routes/WikiTreeSettingsPage.tsx`
-- `apps/ui/tests/routes/WikiTreeSettingsPage.test.tsx`
+- `apps/api/src/api/wikitree/client.py`
+- `apps/api/src/api/wikitree/session.py`
+- `apps/api/src/api/routes/wikitree.py`
+- `apps/api/tests/wikitree/test_client.py`
+- `apps/api/tests/wikitree/test_session.py`
+- `apps/api/tests/wikitree/test_routes.py`
+- `apps/ui/src/components/WikiTreeSettingsPage.tsx`
+- `apps/ui/src/lib/api.ts`
+- `apps/ui/tests/WikiTreeSettingsPage.test.tsx`
 
 Why this is reviewable:
 - One external integration
@@ -303,10 +316,14 @@ Tests:
 - WikiTree auth connect/disconnect
 - private-data access only when connected
 - expired WikiTree session shows reconnect path
+- return_url security validation
+- shared API client with credentials
 
 Acceptance:
 - backend owns WikiTree session material
 - private data is provenance-tagged as WikiTree-authenticated
+- WikiTree cookies stay browser-side, backend stores user_id mapping only
+- 30-day session expiry tracking with verify_and_update support
 
 ### PR5: WikiTree Dump Ingestion App
 
