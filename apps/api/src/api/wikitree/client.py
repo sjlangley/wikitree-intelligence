@@ -1,6 +1,5 @@
 """WikiTree API client for authentication and profile access."""
 
-import asyncio
 import logging
 from typing import Any
 from urllib.parse import urlencode
@@ -97,7 +96,9 @@ class WikiTreeClient:
             WikiTreeAPIError: If authcode validation fails
         """
         if not self._client:
-            raise RuntimeError("Client not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Client not initialized. Use async context manager."
+            )
 
         params = {
             "action": "clientLogin",
@@ -121,15 +122,19 @@ class WikiTreeClient:
                 }
             else:
                 error_msg = client_login.get("error", "Unknown error")
-                logger.error(f"WikiTree authcode validation failed: {error_msg}")
-                raise WikiTreeAPIError(f"Authcode validation failed: {error_msg}")
+                logger.error(
+                    f"WikiTree authcode validation failed: {error_msg}"
+                )
+                raise WikiTreeAPIError(
+                    f"Authcode validation failed: {error_msg}"
+                )
 
         except httpx.HTTPError as e:
             logger.error(f"HTTP error during authcode validation: {e}")
-            raise WikiTreeAPIError(f"HTTP error: {e}")
+            raise WikiTreeAPIError(f"HTTP error: {e}") from e
         except (KeyError, ValueError) as e:
             logger.error(f"Invalid response format: {e}")
-            raise WikiTreeAPIError(f"Invalid API response: {e}")
+            raise WikiTreeAPIError(f"Invalid API response: {e}") from e
 
     async def check_login_status(self, user_id: int) -> bool:
         """Check if a user is still logged in.
@@ -141,7 +146,9 @@ class WikiTreeClient:
             True if user is logged in, False otherwise
         """
         if not self._client:
-            raise RuntimeError("Client not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Client not initialized. Use async context manager."
+            )
 
         params = {
             "action": "clientLogin",
@@ -186,7 +193,9 @@ class WikiTreeClient:
             must be passed from the browser.
         """
         if not self._client:
-            raise RuntimeError("Client not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Client not initialized. Use async context manager."
+            )
 
         params: dict[str, Any] = {
             "action": "getProfile",
@@ -208,13 +217,15 @@ class WikiTreeClient:
                     return profile_data
                 else:
                     error_msg = profile_data.get("status", "Unknown error")
-                    raise WikiTreeAPIError(f"Profile retrieval failed: {error_msg}")
+                    raise WikiTreeAPIError(
+                        f"Profile retrieval failed: {error_msg}"
+                    )
             else:
                 raise WikiTreeAPIError("Invalid response format")
 
         except httpx.HTTPError as e:
             logger.error(f"HTTP error during profile retrieval: {e}")
-            raise WikiTreeAPIError(f"HTTP error: {e}")
+            raise WikiTreeAPIError(f"HTTP error: {e}") from e
         except (KeyError, ValueError, IndexError) as e:
             logger.error(f"Invalid response format: {e}")
-            raise WikiTreeAPIError(f"Invalid API response: {e}")
+            raise WikiTreeAPIError(f"Invalid API response: {e}") from e

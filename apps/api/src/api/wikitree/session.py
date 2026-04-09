@@ -1,7 +1,7 @@
 """WikiTree session management and database integration."""
 
-import logging
 from datetime import datetime, timedelta
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -44,7 +44,7 @@ class WikiTreeSessionManager:
         """
         # Check if connection already exists
         stmt = select(WikiTreeConnection).where(
-            WikiTreeConnection.user_id == user_id
+            WikiTreeConnection.user_id == user_id  # pyrefly: ignore[bad-argument-type]
         )
         result = await self.db.execute(stmt)
         connection = result.scalar_one_or_none()
@@ -91,7 +91,7 @@ class WikiTreeSessionManager:
             WikiTreeConnection or None if not found
         """
         stmt = select(WikiTreeConnection).where(
-            WikiTreeConnection.user_id == user_id
+            WikiTreeConnection.user_id == user_id  # pyrefly: ignore[bad-argument-type]
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -119,7 +119,9 @@ class WikiTreeSessionManager:
         if connection:
             connection.status = "expired"
             await self.db.commit()
-            logger.info(f"Marked WikiTree connection expired for user {user_id}")
+            logger.info(
+                f"Marked WikiTree connection expired for user {user_id}"
+            )
 
     async def verify_and_update(
         self, user_id: UUID, is_valid: bool
