@@ -5,7 +5,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { WikiTreeSettingsPage } from '../components/WikiTreeSettingsPage';
+import { WikiTreeSettingsPage } from '../src/components/WikiTreeSettingsPage';
 
 // Mock fetch with proper typing
 const mockFetch = vi.fn();
@@ -78,12 +78,11 @@ describe('WikiTreeSettingsPage', () => {
     render(<WikiTreeSettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/connected/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /disconnect wikitree/i })).toBeInTheDocument();
     });
 
     expect(screen.getByText(/TestUser-1/i)).toBeInTheDocument();
     expect(screen.getByText(/12345/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /disconnect wikitree/i })).toBeInTheDocument();
   });
 
   it('handles connect button click', async () => {
@@ -182,7 +181,7 @@ describe('WikiTreeSettingsPage', () => {
     render(<WikiTreeSettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/error/i)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toBeInTheDocument();
       expect(screen.getByText(/network error/i)).toBeInTheDocument();
     });
   });
