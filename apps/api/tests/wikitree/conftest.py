@@ -12,7 +12,7 @@ async def db_session():
     """Create an in-memory SQLite database for testing."""
     # Create async engine with in-memory SQLite
     engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
+        'sqlite+aiosqlite:///:memory:',
         echo=False,
     )
 

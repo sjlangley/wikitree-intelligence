@@ -92,11 +92,11 @@ class WikiTreeSessionManager:
                 await self.db.rollback()
                 if attempt == MAX_RETRY_ATTEMPTS - 1:
                     logger.error(
-                        f'Failed to create connection after {MAX_RETRY_ATTEMPTS} attempts: '
-                        f'{user_id}'
+                        f'Failed to create connection after '
+                        f'{MAX_RETRY_ATTEMPTS} attempts: {user_id}'
                     )
                     raise
-                # Concurrent create detected, retry to fetch and update after brief delay
+                # Concurrent create detected, retry after brief delay
                 logger.debug(
                     f'Concurrent connection create detected for {user_id}, '
                     f'retrying (attempt {attempt + 1}/{MAX_RETRY_ATTEMPTS})'

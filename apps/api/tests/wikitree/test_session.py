@@ -3,10 +3,9 @@
 from datetime import datetime, timedelta
 
 import pytest
-from api.database import WikiTreeConnection
+
 from api.wikitree.session import (
     SESSION_EXPIRY_DAYS,
-    WikiTreeSessionManager,
 )
 
 
@@ -16,9 +15,9 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_create_connection_new(self, session_manager):
         """Test creating a new WikiTree connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
         wikitree_user_id = 12345
-        wikitree_user_name = "TestUser-1"
+        wikitree_user_name = 'TestUser-1'
 
         connection = await session_manager.create_connection(
             user_id=user_id,
@@ -28,7 +27,7 @@ class TestWikiTreeSessionManager:
 
         assert connection.user_id == user_id
         assert connection.wikitree_user_key == str(wikitree_user_id)
-        assert connection.status == "connected"
+        assert connection.status == 'connected'
         assert connection.connected_at is not None
         assert connection.expires_at is not None
 
@@ -39,37 +38,37 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_create_connection_update_existing(self, session_manager):
         """Test updating an existing WikiTree connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         # Create initial connection
         connection1 = await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         # Update with new WikiTree user
         connection2 = await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=67890,
-            wikitree_user_name="TestUser-2",
+            wikitree_user_name='TestUser-2',
         )
 
         # Should be same connection record
         assert connection1.id == connection2.id
-        assert connection2.wikitree_user_key == "67890"
-        assert connection2.status == "connected"
+        assert connection2.wikitree_user_key == '67890'
+        assert connection2.status == 'connected'
 
     @pytest.mark.asyncio
     async def test_get_connection_exists(self, session_manager):
         """Test getting an existing connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         # Create connection
         await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         # Retrieve connection
@@ -77,12 +76,12 @@ class TestWikiTreeSessionManager:
 
         assert connection is not None
         assert connection.user_id == user_id
-        assert connection.wikitree_user_key == "12345"
+        assert connection.wikitree_user_key == '12345'
 
     @pytest.mark.asyncio
     async def test_get_connection_not_exists(self, session_manager):
         """Test getting a non-existent connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         connection = await session_manager.get_connection(user_id)
 
@@ -91,13 +90,13 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_disconnect(self, session_manager):
         """Test disconnecting a WikiTree connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         # Create connection
         await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         # Disconnect
@@ -105,13 +104,13 @@ class TestWikiTreeSessionManager:
 
         # Verify status changed
         connection = await session_manager.get_connection(user_id)
-        assert connection.status == "disconnected"
+        assert connection.status == 'disconnected'
         assert connection.session_ref is None
 
     @pytest.mark.asyncio
     async def test_disconnect_nonexistent(self, session_manager):
         """Test disconnecting a non-existent connection (should be no-op)."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         # Should not raise error
         await session_manager.disconnect(user_id)
@@ -119,13 +118,13 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_mark_expired(self, session_manager):
         """Test marking a connection as expired."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         # Create connection
         await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         # Mark expired
@@ -133,12 +132,12 @@ class TestWikiTreeSessionManager:
 
         # Verify status changed
         connection = await session_manager.get_connection(user_id)
-        assert connection.status == "expired"
+        assert connection.status == 'expired'
 
     @pytest.mark.asyncio
     async def test_mark_expired_nonexistent(self, session_manager):
-        """Test marking a non-existent connection as expired (should be no-op)."""
-        user_id = "test-user-id"
+        """Test marking non-existent connection as expired (no-op)."""
+        user_id = 'test-user-id'
 
         # Should not raise error
         await session_manager.mark_expired(user_id)
@@ -146,13 +145,13 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_verify_and_update_valid(self, session_manager):
         """Test verifying and updating a valid connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         # Create connection
         await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         # Verify
@@ -165,13 +164,13 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_verify_and_update_invalid(self, session_manager):
         """Test verifying an invalid (expired) connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         # Create connection
         await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         # Mark as invalid
@@ -179,17 +178,17 @@ class TestWikiTreeSessionManager:
 
         # Should be marked expired
         connection = await session_manager.get_connection(user_id)
-        assert connection.status == "expired"
+        assert connection.status == 'expired'
 
     @pytest.mark.asyncio
     async def test_is_connected_active(self, session_manager):
         """Test is_connected for an active connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         connection = await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         assert session_manager.is_connected(connection) is True
@@ -197,12 +196,12 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_is_connected_disconnected(self, session_manager):
         """Test is_connected for a disconnected connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         await session_manager.disconnect(user_id)
@@ -213,12 +212,12 @@ class TestWikiTreeSessionManager:
     @pytest.mark.asyncio
     async def test_is_connected_expired(self, session_manager):
         """Test is_connected for an expired connection."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         await session_manager.mark_expired(user_id)
@@ -227,16 +226,14 @@ class TestWikiTreeSessionManager:
         assert session_manager.is_connected(connection) is False
 
     @pytest.mark.asyncio
-    async def test_is_connected_past_expiry(
-        self, session_manager, db_session
-    ):
+    async def test_is_connected_past_expiry(self, session_manager, db_session):
         """Test is_connected for a connection past expiry date."""
-        user_id = "test-user-id"
+        user_id = 'test-user-id'
 
         connection = await session_manager.create_connection(
             user_id=user_id,
             wikitree_user_id=12345,
-            wikitree_user_name="TestUser-1",
+            wikitree_user_name='TestUser-1',
         )
 
         # Manually set expires_at to past
