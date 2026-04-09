@@ -127,9 +127,7 @@ export async function initiateWikiTreeConnection(
 /**
  * Handle WikiTree OAuth callback
  */
-export async function handleWikiTreeCallback(
-  authcode: string
-): Promise<WikiTreeConnectionStatus> {
+export async function handleWikiTreeCallback(authcode: string): Promise<WikiTreeConnectionStatus> {
   const response = await fetch(`${getApiBaseUrl()}/api/wikitree/connect/callback`, {
     method: 'POST',
     headers: {
