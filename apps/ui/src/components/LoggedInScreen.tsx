@@ -20,8 +20,7 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
   const { logout } = useAuth();
   const [wikiTreeConnected, setWikiTreeConnected] = useState(false);
 
-  useEffect(() => {
-    // Check WikiTree connection status
+  const fetchWikiTreeStatus = () => {
     fetch('/api/wikitree/status')
       .then(res => res.json())
       .then((data: WikiTreeStatus) => {
@@ -31,6 +30,11 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
         // Ignore errors, default to disconnected
         setWikiTreeConnected(false);
       });
+  };
+
+  useEffect(() => {
+    // Check WikiTree connection status on mount
+    fetchWikiTreeStatus();
   }, []);
 
   async function handleLogout() {
@@ -145,7 +149,7 @@ export function LoggedInScreen({ user }: LoggedInScreenProps) {
           </section>
 
           <aside className="home-sidebar">
-            <WikiTreeSettingsPage />
+            <WikiTreeSettingsPage onStatusChange={fetchWikiTreeStatus} />
 
             <div className="panel-card panel-card-muted">
               <h3>User session</h3>

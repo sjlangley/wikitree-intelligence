@@ -16,7 +16,12 @@ interface WikiTreeConnectionStatus {
 
 const API_BASE = '/api/wikitree';
 
-export function WikiTreeSettingsPage() {
+interface WikiTreeSettingsPageProps {
+  onStatusChange?: () => void;
+}
+
+export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
+  const { onStatusChange } = props;
   const [status, setStatus] = useState<WikiTreeConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +114,10 @@ export function WikiTreeSettingsPage() {
 
       const data = await response.json();
       setStatus(data);
+      // Notify parent component of status change
+      if (onStatusChange) {
+        onStatusChange();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection failed');
     } finally {
@@ -135,6 +144,10 @@ export function WikiTreeSettingsPage() {
 
       // Refresh status
       await fetchStatus();
+      // Notify parent component of status change
+      if (onStatusChange) {
+        onStatusChange();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setLoading(false);
