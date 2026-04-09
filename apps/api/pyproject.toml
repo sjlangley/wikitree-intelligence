@@ -9,7 +9,7 @@ description = "API for wikitree intelligence."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aiosqlite==0.20.0",
+    "aiosqlite==0.21.0",
     "alembic==1.14.0",
     "asyncpg==0.31.0",
     "async-lru==2.3.0",
@@ -38,7 +38,6 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
-    "aiosqlite==0.21.0",
     "asgi-lifespan==2.1.0",
     "httpx>=0.28.1,<1.0.0",
     "pydocstyle==6.3.0",
