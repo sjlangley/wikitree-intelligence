@@ -3,8 +3,6 @@
 Endpoints for managing WikiTree authentication and profile access.
 """
 
-from __future__ import annotations
-
 from collections.abc import AsyncGenerator
 import logging
 from typing import Annotated

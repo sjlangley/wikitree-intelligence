@@ -1,5 +1,6 @@
 """WikiTree session management and database integration."""
 
+import asyncio
 from datetime import datetime, timedelta
 import logging
 
@@ -13,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 # WikiTree sessions typically expire after 30 days of inactivity
 SESSION_EXPIRY_DAYS = 30
+
+# Maximum retry attempts for handling concurrent connection create race
+MAX_RETRY_ATTEMPTS = 3
+
+# Delay between retry attempts (milliseconds)
+RETRY_DELAY_MS = 50
 
 
 class WikiTreeSessionManager:
@@ -46,7 +53,7 @@ class WikiTreeSessionManager:
         expires_at = now + timedelta(days=SESSION_EXPIRY_DAYS)
 
         # Retry loop to handle concurrent connection creation race
-        for attempt in range(3):
+        for attempt in range(MAX_RETRY_ATTEMPTS):
             # Check if connection already exists
             stmt = select(WikiTreeConnection).where(
                 WikiTreeConnection.user_id == user_id  # pyrefly: ignore[bad-argument-type]
@@ -83,17 +90,18 @@ class WikiTreeSessionManager:
                 return connection
             except IntegrityError:
                 await self.db.rollback()
-                if attempt == 2:
+                if attempt == MAX_RETRY_ATTEMPTS - 1:
                     logger.error(
-                        f'Failed to create connection after 3 attempts: '
+                        f'Failed to create connection after {MAX_RETRY_ATTEMPTS} attempts: '
                         f'{user_id}'
                     )
                     raise
-                # Concurrent create detected, retry to fetch and update
+                # Concurrent create detected, retry to fetch and update after brief delay
                 logger.debug(
                     f'Concurrent connection create detected for {user_id}, '
-                    f'retrying'
+                    f'retrying (attempt {attempt + 1}/{MAX_RETRY_ATTEMPTS})'
                 )
+                await asyncio.sleep(RETRY_DELAY_MS / 1000)
                 continue
 
         # Should never reach here due to raise in loop
