@@ -104,12 +104,30 @@ claim_next_job(worker_id: str) -> ImportJob | None:
    - `create_import_job(user_id, file, filename)` - Persist GEDCOM, create job + stages
    - `claim_next_job(worker_id)` - Lease next pending job
    - `heartbeat_job(job_id, worker_id)` - Refresh lease
-   - `run_stage_batch(job_id, worker_id, batch_size)` - Execute one batch of current stage
+   - `get_current_stage(job_id)` - Get active stage for job
+   - `update_stage_progress(job_id, stage_name, records_processed, checkpoint_data)` - Update stage state
    - `transition_stage(job_id, stage_name, status)` - Move stage to next state
    - `fail_job(job_id, error_message)` - Mark job as failed
    - `complete_job(job_id)` - Mark all stages complete
 
-3. **`apps/api/src/api/services/stage_runners.py`** (NEW)
+3. **`apps/api/src/api/app.py`** (MODIFY)
+   - Register import_jobs router
+   - Add startup check for `/data/gedcom` directory existence
+
+4. **`apps/api/src/api/database.py`** (MODIFY)
+   - Add file storage helper: `get_gedcom_storage_path(user_id, job_id)`
+
+### Worker Process (3 files)
+
+5. **`apps/worker/main.py`** (NEW)
+   - Main worker loop (run via `python -m worker.main`)
+   - Polls for jobs every 5 seconds
+   - Claims job via API service, runs batches using local stage runners
+   - Graceful shutdown on SIGTERM/SIGINT
+   - Logging for observability
+   - Imports from `api.services.import_pipeline` and `api.database` for state management
+
+6. **`apps/worker/stage_runners.py`** (NEW)
    - `validate_stage(job_id, batch_size)` - Check GEDCOM format/encoding
    - `parse_stage(job_id, batch_size)` - Stub: log progress, sleep 0.1s per "record"
    - `normalize_stage(job_id, batch_size)` - Stub: log progress
@@ -117,23 +135,6 @@ claim_next_job(worker_id: str) -> ImportJob | None:
    - `match_stage(job_id, batch_size)` - Stub: log progress
    - `review_stage(job_id, batch_size)` - Stub: log progress
    - Each returns: `{records_processed: int, stage_complete: bool, checkpoint_data: dict}`
-
-4. **`apps/api/src/api/app.py`** (MODIFY)
-   - Register import_jobs router
-   - Add startup check for `/data/gedcom` directory existence
-
-5. **`apps/api/src/api/database.py`** (MODIFY)
-   - Add file storage helper: `get_gedcom_storage_path(user_id, job_id)`
-
-### Worker Process (2 files)
-
-6. **`apps/worker/main.py`** (NEW)
-   - Main worker loop (run via `python -m worker.main`)
-   - Polls for jobs every 5 seconds
-   - Claims job, runs batches, commits checkpoints
-   - Graceful shutdown on SIGTERM/SIGINT
-   - Logging for observability
-   - Imports from `api.services.import_pipeline` and `api.database`
 
 7. **`apps/worker/__init__.py`** (NEW)
    - Makes worker a proper Python package
@@ -321,8 +322,17 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from api.services.import_pipeline import claim_next_job, heartbeat_job, run_stage_batch, fail_job
-from api.database import init_db
+from api.services.import_pipeline import (
+    claim_next_job,
+    heartbeat_job,
+    get_current_stage,
+    update_stage_progress,
+    transition_stage,
+    fail_job,
+    complete_job,
+)
+from api.database import init_db, get_db
+from worker.stage_runners import STAGE_RUNNERS
 import logging
 
 logger = logging.getLogger(__name__)
@@ -365,80 +375,103 @@ async def main():
     
     logger.info(f"Worker {WORKER_ID} shut down cleanly")
 
-async def process_job(job):
-    last_heartbeat = time.time()
-    
-    while not shutdown_flag:
-        # Refresh heartbeat
-        if time.time() - last_heartbeat > HEARTBEAT_INTERVAL:
-            await heartbeat_job(job.id, WORKER_ID)
-            last_heartbeat = time.time()
-        
-        # Run one batch
-        result = await run_stage_batch(job.id, WORKER_ID, BATCH_SIZE)
-        
-        if result["job_complete"]:
-            logger.info(f"Job {job.id} completed")
-            break
-        
-        if result["job_paused"]:
-            logger.info(f"Job {job.id} paused")
-            break
-        
-        if result["job_failed"]:
-            logger.error(f"Job {job.id} failed: {result['error']}")
-            break
-        
-        # Small delay between batches
-        await asyncio.sleep(0.1)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Batch Processing
+async def Get current stage
+        async with get_db() as db:
+            current_stage = await get_current_stage(db, job.id)
+            
+            if current_stage is None:
+                # All stages complete
+                await complete_job(db, job.id)
+                logger.info(f"Job {job.id} completed")
+                break
+            
+            # Check if job was paused
+            if job.status == "paused":
+                logger.info(f"Job {job.id} paused")
+                break
+            
+            # Run one batch using worker's stage runner
+            runner = STAGE_RUNNERS[current_stage.stage_name]
+            
+            try:
+                result = await runner(db, job.id, BATCH_SIZE)
+                
+                # Update stage progress
+                await update_stage_progress(
+                    db,
+                    job.id,
+                    current_stage.stage_name,
+                    result["records_processed"],
+                    result.get("checkpoint_data"),
+                )
+                
+                if result["stage_complete"]:
+    State Management (API responsibility)
 
 ```python
 # apps/api/src/api/services/import_pipeline.py
-async def run_stage_batch(job_id: str, worker_id: str, batch_size: int) -> dict:
-    """Execute one batch of the current stage."""
-    async with get_db() as db:
-        # Get current job state
-        job = await db.get(ImportJob, job_id)
-        
-        if job.status == "paused":
-            return {"job_paused": True}
-        
-        # Get current stage
-        current_stage = await get_current_stage(db, job_id)
-        
-        if current_stage is None:
-            # All stages complete
-            await complete_job(db, job_id)
-            return {"job_complete": True}
-        
-        # Run stage-specific batch handler
-        from api.services.stage_runners import STAGE_RUNNERS
-        runner = STAGE_RUNNERS[current_stage.stage_name]
-        
-        try:
-            result = await runner(db, job_id, batch_size)
-            
-            # Update stage progress
-            current_stage.records_processed += result["records_processed"]
-            current_stage.last_checkpoint = datetime.utcnow()
-            
+async def get_current_stage(db: AsyncSession, job_id: str) -> ImportJobStage | None:
+    """Get the current active stage for a job."""
+    result = await db.execute(
+        select(ImportJobStage)
+        .where(ImportJobStage.job_id == job_id)
+        .where(ImportJobStage.status.in_([ImportJobStageStatus.PENDING, ImportJobStageStatus.RUNNING]))
+        .order_by(ImportJobStage.created_at)
+    )
+    return result.scalars().first()
+
+async def update_stage_progress(
+    db: AsyncSession,
+    job_id: str,
+    stage_name: str,
+    records_processed: int,
+    checkpoint_data: dict | None = None,
+) -> None:
+    """Update stage progress after batch completion."""
+    result = await db.execute(
+        select(ImportJobStage)
+        .where(ImportJobStage.job_id == job_id)
+        .where(ImportJobStage.stage_name == stage_name)
+    )
+    stage = result.scalars().first()
+    
+    if stage:
+        stage.records_processed += records_processed
+        stage.last_checkpoint = datetime.utcnow()
+        if checkpoint_data:
+            stage.stage_data = checkpoint_data
+
+async def transition_stage(
+    db: AsyncSession,
+    job_id: str,
+    stage_name: str,
+    status: str,
+) -> None:
+    """Transition a stage to a new status."""
+    result = await db.execute(
+        select(ImportJobStage)
+        .where(ImportJobStage.job_id == job_id)
+        .where(ImportJobStage.stage_name == stage_name)
+    )
+    stage = result.scalars().first()
+    
+    if stage:
+        stage.status = ImportJobStageStatus[status.upper()]
+        if status == "completed":
+            stage.completed_at = datetime.utcnow()
+        elif status == "failed":
+            stage.completed_at = datetime.utcnow()
             if result.get("stage_data"):
                 current_stage.stage_data = result["stage_data"]
             
             if result["stage_complete"]:
                 current_stage.status = ImportJobStageStatus.COMPLETED
-                current_stage.completed_at = datetime.utcnow()
-                logger.info(f"Stage {current_stage.stage_name} completed for job {job_id}")
-            
-            await db.commit()
-            
-            return {
+                curre (Worker responsibility)
+
+For PR6, implement minimal stubs that simulate work:
+
+```python
+# apps/worker
                 "job_complete": False,
                 "job_paused": False,
                 "records_processed": result["records_processed"]
@@ -612,11 +645,11 @@ STAGE_RUNNERS = {
 - [ ] Each stage processes in batches with durable checkpoints
 - [ ] Job status updates visible via GET /api/import-jobs/{id}
 - [ ] Pause stops job after current batch, resume re-queues it
-- [ ] Cancel deletes job and GEDCOM files
+- [ ] Cancel deletes job and GEDCOM filesClean separation: API owns HTTP + state management, Worker owns job execution + stage logic
 - [ ] Stale jobs (no heartbeat) are reclaimed by another worker
 - [ ] Failed stages mark job as failed with error message
 - [ ] UI shows job list with status badges
-- [ ] UI shows job detail with stage progress bars
+- [ ] UI shows job detail with stage progress barsdatabase models and state management only - execution logic lives in worker
 - [ ] UI auto-refreshes while job is running
 - [ ] All tests pass (backend + frontend)
 - [ ] Backend coverage ≥ 80%
