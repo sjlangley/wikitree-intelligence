@@ -6,11 +6,11 @@ These models serve as:
 - Single source of truth for the schema
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Date, Enum as SQLEnum
 from sqlmodel import JSON, Column, Field, SQLModel
 
 from api.state_machines import (
@@ -69,7 +69,7 @@ class ImportJob(SQLModel, table=True):
     stored_path: str
     file_size_bytes: int
     content_sha256: str
-    status: str = Field(
+    status: ImportJobStatus = Field(
         sa_column=Column(SQLEnum(ImportJobStatus), index=True, nullable=False)
     )
     current_stage: str | None = None
@@ -89,7 +89,7 @@ class ImportJobStage(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     import_job_id: UUID = Field(foreign_key='import_jobs.id', index=True)
     stage_name: str  # parse | normalize | search | match | review
-    status: str = Field(
+    status: ImportJobStageStatus = Field(
         sa_column=Column(
             SQLEnum(ImportJobStageStatus), index=True, nullable=False
         )
@@ -222,7 +222,7 @@ class WikiTreeDumpVersion(SQLModel, table=True):
     __tablename__ = 'wikitree_dump_versions'  # pyrefly: ignore[bad-override]
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    dump_date: datetime = Field(unique=True, sa_column_kwargs={'type_': 'DATE'})
+    dump_date: date = Field(sa_column=Column(Date, unique=True))
     downloaded_at: datetime | None = None
     loaded_at: datetime | None = None
     record_count: int | None = None

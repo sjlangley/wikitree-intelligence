@@ -5,11 +5,12 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.engine.url import URL
+from sqlalchemy.engine.url import URL, make_url
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from starlette.middleware.sessions import SessionMiddleware
 
+import api.database  # noqa: F401 - Import to register models with SQLModel metadata
 from api.enums import Environment
 from api.logging import setup_logging
 from api.routes import auth, health, user
@@ -32,6 +33,8 @@ def _get_safe_settings_for_logging(settings_to_log: Settings) -> dict:
     sensitive_fields = {
         'client_id',
         'session_secret_key',
+        'database_password',
+        'database_url',
     }
 
     data = settings_to_log.model_dump()
@@ -93,9 +96,11 @@ async def lifespan(application: FastAPI):
         database_url = tcp_connection_url()
 
     # Redact password from database URL for logging
-    safe_url = str(database_url)
-    if settings.database_password:
-        safe_url = safe_url.replace(f':{settings.database_password}@', ':***@')
+    # Use SQLAlchemy's built-in method to safely hide credentials
+    if isinstance(database_url, str):
+        safe_url = make_url(database_url).render_as_string(hide_password=True)
+    else:
+        safe_url = database_url.render_as_string(hide_password=True)
     logger.info(f'Final Database URL: {safe_url}')
 
     application.state.engine = create_async_engine(
