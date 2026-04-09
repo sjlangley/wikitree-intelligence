@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.database import WikiTreeConnection
@@ -41,42 +42,60 @@ class WikiTreeSessionManager:
         Returns:
             WikiTreeConnection record
         """
-        # Check if connection already exists
-        stmt = select(WikiTreeConnection).where(
-            WikiTreeConnection.user_id == user_id  # pyrefly: ignore[bad-argument-type]
-        )
-        result = await self.db.execute(stmt)
-        connection = result.scalar_one_or_none()
-
         now = datetime.utcnow()
         expires_at = now + timedelta(days=SESSION_EXPIRY_DAYS)
 
-        if connection:
-            # Update existing connection
-            connection.wikitree_user_key = str(wikitree_user_id)
-            connection.status = "connected"
-            connection.session_ref = wikitree_user_name
-            connection.connected_at = now
-            connection.expires_at = expires_at
-            connection.last_verified_at = now
-            logger.info(f"Updated WikiTree connection for user {user_id}")
-        else:
-            # Create new connection
-            connection = WikiTreeConnection(
-                user_id=user_id,
-                wikitree_user_key=str(wikitree_user_id),
-                status="connected",
-                session_ref=wikitree_user_name,
-                connected_at=now,
-                expires_at=expires_at,
-                last_verified_at=now,
+        # Retry loop to handle concurrent connection creation race
+        for attempt in range(3):
+            # Check if connection already exists
+            stmt = select(WikiTreeConnection).where(
+                WikiTreeConnection.user_id == user_id  # pyrefly: ignore[bad-argument-type]
             )
-            self.db.add(connection)
-            logger.info(f"Created WikiTree connection for user {user_id}")
+            result = await self.db.execute(stmt)
+            connection = result.scalar_one_or_none()
 
-        await self.db.commit()
-        await self.db.refresh(connection)
-        return connection
+            if connection:
+                # Update existing connection
+                connection.wikitree_user_key = str(wikitree_user_id)
+                connection.status = "connected"
+                connection.session_ref = wikitree_user_name
+                connection.connected_at = now
+                connection.expires_at = expires_at
+                connection.last_verified_at = now
+                logger.info(f"Updated WikiTree connection for user {user_id}")
+            else:
+                # Create new connection
+                connection = WikiTreeConnection(
+                    user_id=user_id,
+                    wikitree_user_key=str(wikitree_user_id),
+                    status="connected",
+                    session_ref=wikitree_user_name,
+                    connected_at=now,
+                    expires_at=expires_at,
+                    last_verified_at=now,
+                )
+                self.db.add(connection)
+                logger.info(f"Created WikiTree connection for user {user_id}")
+
+            try:
+                await self.db.commit()
+                await self.db.refresh(connection)
+                return connection
+            except IntegrityError:
+                await self.db.rollback()
+                if attempt == 2:
+                    logger.error(
+                        f"Failed to create connection after 3 attempts: {user_id}"
+                    )
+                    raise
+                # Concurrent create detected, retry to fetch and update
+                logger.debug(
+                    f"Concurrent connection create detected for {user_id}, retrying"
+                )
+                continue
+
+        # Should never reach here due to raise in loop
+        raise RuntimeError("Unexpected state in create_connection")
 
     async def get_connection(
         self, user_id: str

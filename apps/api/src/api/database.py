@@ -45,7 +45,9 @@ class WikiTreeConnection(SQLModel, table=True):
     __tablename__ = 'wikitree_connections'  # pyrefly: ignore[bad-override]
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: str = Field(index=True, unique=True)  # Google subject ID
+    # user_id stores Google subject ID directly (not FK to app_users)
+    # because auth uses JWT validation, not database user lookups
+    user_id: str = Field(index=True, unique=True)
     wikitree_user_key: str | None = None
     status: str  # connected | disconnected | expired | failed
     session_ref: str | None = None
