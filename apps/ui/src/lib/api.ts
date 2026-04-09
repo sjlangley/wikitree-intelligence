@@ -62,3 +62,101 @@ export async function logout(): Promise<void> {
     throw new Error('Logout failed');
   }
 }
+
+/**
+ * WikiTree API types
+ */
+export interface WikiTreeConnectionStatus {
+  is_connected: boolean;
+  wikitree_user_id: number | null;
+  wikitree_user_name: string | null;
+  connected_at: string | null;
+  expires_at: string | null;
+  last_verified_at: string | null;
+}
+
+export interface WikiTreeConnectInitiateRequest {
+  return_url: string;
+}
+
+export interface WikiTreeConnectInitiateResponse {
+  login_url: string;
+}
+
+export interface WikiTreeConnectCallbackRequest {
+  authcode: string;
+}
+
+/**
+ * Get WikiTree connection status
+ */
+export async function getWikiTreeStatus(): Promise<WikiTreeConnectionStatus> {
+  const response = await fetch(`${getApiBaseUrl()}/api/wikitree/status`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch WikiTree status');
+  }
+
+  return response.json();
+}
+
+/**
+ * Initiate WikiTree connection
+ */
+export async function initiateWikiTreeConnection(
+  returnUrl: string
+): Promise<WikiTreeConnectInitiateResponse> {
+  const response = await fetch(`${getApiBaseUrl()}/api/wikitree/connect/initiate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ return_url: returnUrl }),
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to initiate WikiTree connection');
+  }
+
+  return response.json();
+}
+
+/**
+ * Handle WikiTree OAuth callback
+ */
+export async function handleWikiTreeCallback(
+  authcode: string
+): Promise<WikiTreeConnectionStatus> {
+  const response = await fetch(`${getApiBaseUrl()}/api/wikitree/connect/callback`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ authcode }),
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to connect to WikiTree');
+  }
+
+  return response.json();
+}
+
+/**
+ * Disconnect from WikiTree
+ */
+export async function disconnectWikiTree(): Promise<void> {
+  const response = await fetch(`${getApiBaseUrl()}/api/wikitree/disconnect`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+
+  if (!response.ok && response.status !== 204) {
+    throw new Error('Failed to disconnect from WikiTree');
+  }
+}

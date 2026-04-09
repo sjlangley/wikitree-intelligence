@@ -4,6 +4,7 @@
  */
 
 import { useAuth } from '../lib/auth';
+import { getWikiTreeStatus } from '../lib/api';
 import { WikiTreeSettingsPage } from './WikiTreeSettingsPage';
 import { useEffect, useState } from 'react';
 import type { User } from '../types/api';
@@ -12,18 +13,13 @@ interface LoggedInScreenProps {
   user: User;
 }
 
-interface WikiTreeStatus {
-  is_connected: boolean;
-}
-
 export function LoggedInScreen({ user }: LoggedInScreenProps) {
   const { logout } = useAuth();
   const [wikiTreeConnected, setWikiTreeConnected] = useState(false);
 
   const fetchWikiTreeStatus = () => {
-    fetch('/api/wikitree/status')
-      .then((res) => res.json())
-      .then((data: WikiTreeStatus) => {
+    getWikiTreeStatus()
+      .then((data) => {
         setWikiTreeConnected(data.is_connected);
       })
       .catch(() => {

@@ -4,17 +4,13 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-
-interface WikiTreeConnectionStatus {
-  is_connected: boolean;
-  wikitree_user_id: number | null;
-  wikitree_user_name: string | null;
-  connected_at: string | null;
-  expires_at: string | null;
-  last_verified_at: string | null;
-}
-
-const API_BASE = '/api/wikitree';
+import {
+  getWikiTreeStatus,
+  initiateWikiTreeConnection,
+  handleWikiTreeCallback,
+  disconnectWikiTree,
+  type WikiTreeConnectionStatus,
+} from '../lib/api';
 
 interface WikiTreeSettingsPageProps {
   onStatusChange?: () => void;
@@ -33,13 +29,7 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE}/status`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch connection status');
-      }
-
-      const data = await response.json();
+      const data = await getWikiTreeStatus();
       setStatus(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -56,19 +46,7 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
       // Get the current URL as return URL
       const returnUrl = window.location.href;
 
-      const response = await fetch(`${API_BASE}/connect/initiate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ return_url: returnUrl }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to initiate connection');
-      }
-
-      const data = await response.json();
+      const data = await initiateWikiTreeConnection(returnUrl);
 
       // Redirect to WikiTree login
       window.location.href = data.login_url;
@@ -78,26 +56,13 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
     }
   }
 
-  const handleCallback = useCallback(
+  const handleOAuthCallback = useCallback(
     async (authcode: string) => {
       try {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`${API_BASE}/connect/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ authcode }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to connect');
-        }
-
-        const data = await response.json();
+        const data = await handleWikiTreeCallback(authcode);
         setStatus(data);
         // Notify parent component of status change
         if (onStatusChange) {
@@ -121,13 +86,7 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE}/disconnect`, {
-        method: 'POST',
-      });
-
-      if (!response.ok && response.status !== 204) {
-        throw new Error('Failed to disconnect');
-      }
+      await disconnectWikiTree();
 
       // Refresh status
       await fetchStatus();
@@ -153,11 +112,11 @@ export function WikiTreeSettingsPage(props: WikiTreeSettingsPageProps = {}) {
     const authcode = urlParams.get('authcode');
 
     if (authcode) {
-      handleCallback(authcode);
+      handleOAuthCallback(authcode);
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [handleCallback]);
+  }, [handleOAuthCallback]);
 
   if (loading && !status) {
     return (
