@@ -49,14 +49,13 @@ def validate_return_url(return_url: str) -> None:
         HTTPException: If URL is not safe (absolute URL or suspicious)
     """
     parsed = urlparse(return_url)
-    
+
     # Allow only relative paths (no scheme/netloc)
     if parsed.scheme or parsed.netloc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                'return_url must be a relative path '
-                '(e.g., /wikitree/callback)'
+                'return_url must be a relative path (e.g., /wikitree/callback)'
             ),
         )
 
@@ -244,7 +243,7 @@ async def handle_callback(
             raise WikiTreeAPIError(
                 f'Invalid WikiTree user_id format: {user_info["user_id"]}'
             ) from e
-        
+
         wikitree_user_name = user_info['user_name']
 
         logger.info(
