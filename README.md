@@ -45,13 +45,18 @@ This repo is in active development.
 
 ### In Progress
 
+**Next:** Import job infrastructure (PR6) - see [`pr6-import-job-plan.md`](./pr6-import-job-plan.md) for detailed implementation plan.
+
 Planning and architecture documentation:
 
 - [`office-hours-design.md`](./office-hours-design.md) — approved product/design doc
 - [`implementation-plan.md`](./implementation-plan.md) — PR-by-PR build plan
+- [`pr6-import-job-plan.md`](./pr6-import-job-plan.md) — detailed PR6 implementation spec
 - [`eng-review-test-plan.md`](./eng-review-test-plan.md) — test strategy and critical
   flows
 - [`TODOS.md`](./TODOS.md) — deferred follow-up work
+
+**Note:** PR5 (WikiTree dump ingestion) deferred until dump access is available. Building job infrastructure first.
 
 ## Planned Stack
 

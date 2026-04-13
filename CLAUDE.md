@@ -931,7 +931,7 @@ npm run build
 1. **Make your changes**
 2. **Run pre-commit checks for affected code**
    - Changed backend? Run backend checks
-   - Changed frontend? Run frontend checks  
+   - Changed frontend? Run frontend checks
    - Changed both? Run both sets of checks
 3. **Fix any failures** - Do not commit if checks fail
 4. **Commit only after ALL checks pass**

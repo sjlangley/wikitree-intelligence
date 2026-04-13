@@ -413,11 +413,15 @@ Implementation notes:
 - Or: keep last 2 dumps for rollback capability
 - Track which dump is "current" for search queries
 
+**Note:** PR5 deferred until WikiTree dump access is available. Proceeding with PR6 to build job infrastructure first.
+
 ### PR6: Import Job API + Staged Pipeline Shell
+
+**Status:** Next - detailed plan in [`pr6-import-job-plan.md`](./pr6-import-job-plan.md)
 
 Purpose:
 Create resumable staged import jobs and a worker-owned execution loop without full
-GEDCOM parsing yet.
+GEDCOM parsing yet. Establishes worker pattern, job lifecycle, and checkpointing system.
 
 Files:
 - `apps/api/src/api/import_jobs.py`
