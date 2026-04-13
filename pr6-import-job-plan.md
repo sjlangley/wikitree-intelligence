@@ -574,7 +574,7 @@ For PR6, implement minimal stubs that simulate work:
 For PR6, implement minimal stubs that simulate work:
 
 ```python
-# apps/api/src/api/services/stage_runners.py
+# apps/worker/stage_runners.py
 async def validate_stage(db: AsyncSession, job_id: str, batch_size: int) -> dict:
     """Validate GEDCOM file format."""
     job = await db.get(ImportJob, job_id)
