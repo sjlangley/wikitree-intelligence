@@ -76,5 +76,11 @@ class Settings(BaseSettings):
     database_host: str = Field(default='localhost', alias='DATABASE_HOST')
     database_port: int = Field(default=5432, alias='DATABASE_PORT')
 
+    gedcom_storage_path: str = Field(
+        default='/data/gedcom',
+        description='Root directory for GEDCOM file storage',
+        alias='GEDCOM_STORAGE_PATH',
+    )
+
 
 settings = Settings()  # pyrefly: ignore[missing-argument]
