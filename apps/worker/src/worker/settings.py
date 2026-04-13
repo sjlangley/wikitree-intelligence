@@ -4,6 +4,9 @@ It uses Pydantic's BaseSettings to load environment variables from a `.env`
 file.
 """
 
+import os
+import socket
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from worker.enums import Environment
@@ -15,6 +18,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env')
 
     log_level: str = Field(default='INFO', alias='LOG_LEVEL')
+
+    # Worker identification
+    worker_id: str = Field(
+        default_factory=lambda: os.getenv(
+            'WORKER_ID', f'worker-{socket.gethostname()}-{os.getpid()}'
+        ),
+        description='Unique worker identifier for lease tracking',
+        alias='WORKER_ID',
+    )
 
     # Environment setting (e.g., 'development', 'production')
     environment: Environment = Field(

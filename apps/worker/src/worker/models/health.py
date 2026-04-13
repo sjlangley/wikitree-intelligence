@@ -8,4 +8,5 @@ class HealthCheck(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
-    status: str = 'OK'
+    status: str
+    worker_id: str
