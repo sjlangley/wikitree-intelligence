@@ -138,7 +138,7 @@ def _job_to_response(
                 )
             )
 
-    logger.info(
+    logger.debug(
         'Converting job to response: %s - status: %s - stages: %d',
         job.id,
         job.status.value,
@@ -155,7 +155,7 @@ def _job_to_response(
         heartbeat_at=job.claimed_at.isoformat() if job.claimed_at else None,
         stages=stage_responses,
         created_at=job.created_at.isoformat(),
-        updated_at=job.created_at.isoformat(),  # TODO: Add updated_at to model
+        updated_at=None,  # TODO: Add updated_at field to ImportJob model
     )
 
 
@@ -254,7 +254,7 @@ async def list_import_jobs(
         db: Database session
         limit: Maximum jobs to return (1-100)
         offset: Pagination offset
-        status: Optional status filter (pending/running/paused/completed/failed)
+        status: Optional status filter (uploaded/queued/in_progress/paused/completed/failed/cancelled)
 
     Returns:
         Paginated list of import jobs

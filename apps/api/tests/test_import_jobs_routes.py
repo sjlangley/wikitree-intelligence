@@ -449,7 +449,7 @@ async def test_resume_job_not_paused(async_test_client, test_db, test_user):
 async def test_delete_job_success(
     async_test_client, test_db, test_user, temp_gedcom_storage, monkeypatch
 ):
-    """Test deleting job and files."""
+    """Test deleting job, files, and stages."""
     monkeypatch.setattr(
         'api.routes.import_jobs.GEDCOM_STORAGE_ROOT', temp_gedcom_storage
     )
@@ -467,9 +467,27 @@ async def test_delete_job_success(
     await test_db.flush()  # Flush to get job.id
     job_id = job.id  # Cache ID before commit
 
+    # Add stages to verify cascade delete works
+    for idx, stage_name in enumerate(['validate', 'parse']):
+        stage = ImportJobStage(
+            import_job_id=job_id,
+            stage_name=stage_name,
+            order=idx,
+            status=ImportJobStageStatus.PENDING,
+        )
+        test_db.add(stage)
+
     # Update stored_path to match actual implementation pattern
     job.stored_path = f'{test_user.userid}/{job_id}/original.ged'
     await test_db.commit()
+
+    # Verify stages exist before delete
+    from sqlalchemy import select
+
+    stages_before = await test_db.execute(
+        select(ImportJobStage).where(ImportJobStage.import_job_id == job_id)
+    )
+    assert len(list(stages_before.scalars().all())) == 2
 
     # Create file using the actual job_id (matching implementation)
     file_path = temp_gedcom_storage / test_user.userid / str(job_id)
@@ -485,6 +503,12 @@ async def test_delete_job_success(
 
     # Verify file deleted
     assert not file_path.exists()
+
+    # Verify stages deleted
+    stages_after = await test_db.execute(
+        select(ImportJobStage).where(ImportJobStage.import_job_id == job_id)
+    )
+    assert len(list(stages_after.scalars().all())) == 0
 
 
 @pytest.mark.asyncio

@@ -8,13 +8,14 @@ Handles business logic for import job lifecycle:
 """
 
 from datetime import datetime, timedelta
+import hashlib
 import logging
 from pathlib import Path
 import shutil
 from typing import BinaryIO
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.database import ImportJob, ImportJobStage
@@ -58,17 +59,26 @@ async def create_import_job(
     db.add(job)
     await db.flush()  # Get job.id
 
-    # Store GEDCOM file
+    # Store GEDCOM file (streaming to avoid memory doubling)
     storage_path = gedcom_storage_root / str(user_id) / str(job.id)
     storage_path.mkdir(parents=True, exist_ok=True)
 
     file_path = storage_path / 'original.ged'
-    content = file.read()
-    file_path.write_bytes(content)
+
+    # Stream file to disk and compute size/hash incrementally
+    sha256_hash = hashlib.sha256()
+    file_size = 0
+
+    with open(file_path, 'wb') as f:
+        while chunk := file.read(8192):  # 8KB chunks
+            f.write(chunk)
+            sha256_hash.update(chunk)
+            file_size += len(chunk)
 
     # Update job with file metadata
     job.stored_path = f'{user_id}/{job.id}/original.ged'
-    job.file_size_bytes = len(content)
+    job.file_size_bytes = file_size
+    job.content_sha256 = sha256_hash.hexdigest()
     job.upload_completed_at = datetime.utcnow()
     # Transition to queued state now that upload is complete
     job.status = ImportJobStatus.QUEUED
@@ -147,7 +157,7 @@ async def list_user_jobs(
         limit: Max jobs to return
         offset: Pagination offset
         status_filter: Optional status filter
-            (pending/running/paused/completed/failed)
+            (uploaded/queued/in_progress/paused/completed/failed/cancelled)
 
     Returns:
         Tuple of (jobs list, total count)
@@ -161,9 +171,10 @@ async def list_user_jobs(
         except KeyError:
             pass  # Invalid status, ignore filter
 
-    # Get total count
-    count_result = await db.execute(query)
-    total = len(list(count_result.scalars().all()))
+    # Get total count efficiently with COUNT(*)
+    count_query = select(func.count()).select_from(query.subquery())  # pyrefly: ignore
+    count_result = await db.execute(count_query)
+    total = count_result.scalar_one()
 
     # Get paginated results
     query = (
@@ -282,9 +293,9 @@ async def cancel_job(
     if storage_path.exists():
         shutil.rmtree(storage_path)
 
-    # Delete stages
+    # Delete stages (use DELETE statement, not SELECT)
     await db.execute(
-        select(ImportJobStage).where(ImportJobStage.import_job_id == job_id)  # pyrefly: ignore
+        delete(ImportJobStage).where(ImportJobStage.import_job_id == job_id)  # pyrefly: ignore
     )
 
     # Delete job
@@ -394,16 +405,15 @@ async def get_current_stage(
                 [ImportJobStageStatus.PENDING, ImportJobStageStatus.IN_PROGRESS]
             )
         )
-        .order_by(ImportJobStage.id)  # pyrefly: ignore
+        .order_by(ImportJobStage.order)  # pyrefly: ignore
     )
-    return result.scalar_one_or_none()
+    return result.scalars().first()
 
 
 async def update_stage_progress(
     db: AsyncSession,
     job_id: UUID,
     stage_name: str,
-    records_processed: int,
     checkpoint_data: dict | None = None,
 ) -> None:
     """Update stage progress after batch completion.
@@ -412,7 +422,6 @@ async def update_stage_progress(
         db: Database session
         job_id: Job ID
         stage_name: Stage name
-        records_processed: Number of records processed in this batch
         checkpoint_data: Optional checkpoint data to store
     """
     result = await db.execute(
@@ -426,7 +435,7 @@ async def update_stage_progress(
     if stage is None:
         raise ValueError(f'Stage {stage_name} not found for job {job_id}')
 
-    # Update progress (increment, don't replace)
+    # Update checkpoint data
     stage.checkpoint_json = checkpoint_data or stage.checkpoint_json
 
     await db.commit()

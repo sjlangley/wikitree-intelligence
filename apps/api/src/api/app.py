@@ -132,7 +132,7 @@ if settings.client_origins:
         CORSMiddleware,
         allow_origins=settings.client_origins,
         allow_credentials=True,
-        allow_methods=['GET', 'POST'],
+        allow_methods=['GET', 'POST', 'DELETE', 'OPTIONS'],
         allow_headers=['Content-Type', 'Authorization'],
     )
 
