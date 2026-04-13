@@ -350,7 +350,7 @@ Already exist in PR2 schema. No new tables needed.
 
 `import_jobs` table:
 - `worker_id` - Set when job is claimed, NULL when pending/paused
-- `heartbeat_at` - Updated every 30s by worker
+- `heartbeat_at` - Updated every 60s by worker
 - `gedcom_path` - Relative path: `{user_id}/{job_id}/original.ged`
 - `gedcom_filename` - Original upload filename
 - `gedcom_size_bytes` - File size for progress estimation
