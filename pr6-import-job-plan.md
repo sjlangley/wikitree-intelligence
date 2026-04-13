@@ -455,7 +455,9 @@ async def worker_main_loop():
 
     logger.info(f"Worker {WORKER_ID} shut down cleanly")
 
-async def Get current stage
+async def process_job(job):
+    """Process all stages for a job with batch checkpointing."""
+    while True:
         async with get_db() as db:
             current_stage = await get_current_stage(db, job.id)
 
@@ -486,7 +488,20 @@ async def Get current stage
                 )
 
                 if result["stage_complete"]:
-    State Management (API responsibility)
+                    await transition_stage(db, job.id, current_stage.stage_name, "completed")
+
+                await heartbeat_job(db, job.id, WORKER_ID)
+                await db.commit()
+
+            except Exception as e:
+                logger.error(f"Stage {current_stage.stage_name} failed: {e}")
+                await transition_stage(db, job.id, current_stage.stage_name, "failed")
+                await fail_job(db, job.id, str(e))
+                await db.commit()
+                raise
+```
+
+### State Management (API Service)
 
 ```python
 # apps/api/src/api/services/import_pipeline.py
@@ -541,32 +556,6 @@ async def transition_stage(
             stage.completed_at = datetime.utcnow()
         elif status == "failed":
             stage.completed_at = datetime.utcnow()
-            if result.get("stage_data"):
-                current_stage.stage_data = result["stage_data"]
-
-            if result["stage_complete"]:
-                current_stage.status = ImportJobStageStatus.COMPLETED
-                curre (Worker responsibility)
-
-For PR6, implement minimal stubs that simulate work:
-
-```python
-# apps/worker
-                "job_complete": False,
-                "job_paused": False,
-                "records_processed": result["records_processed"]
-            }
-
-        except Exception as e:
-            logger.error(f"Stage {current_stage.stage_name} failed: {e}")
-            current_stage.status = ImportJobStageStatus.FAILED
-            current_stage.error_message = str(e)
-            current_stage.completed_at = datetime.utcnow()
-
-            job.status = ImportJobStatus.FAILED
-            await db.commit()
-
-            return {"job_failed": True, "error": str(e)}
 ```
 
 ## Stage Runner Stubs
@@ -909,7 +898,8 @@ Full user flow with Playwright, deferred until backend + frontend integrated:
 - [ ] Each stage processes in batches with durable checkpoints
 - [ ] Job status updates visible via GET /api/import-jobs/{id}
 - [ ] Pause stops job after current batch, resume re-queues it
-- [ ] Cancel deletes job and GEDCOM filesClean separation: API owns HTTP + state management, Worker owns job execution + stage logic
+- [ ] Cancel deletes job and GEDCOM files
+- [ ] Clean separation: API owns HTTP + state management, Worker owns job execution + stage logic
 - [ ] Stale jobs (no heartbeat) are reclaimed by another worker
 - [ ] Failed stages mark job as failed with error message
 - [ ] UI shows job list with status badges
