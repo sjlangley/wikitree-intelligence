@@ -913,7 +913,8 @@ Full user flow with Playwright, deferred until backend + frontend integrated:
 - [ ] Stale jobs (no heartbeat) are reclaimed by another worker
 - [ ] Failed stages mark job as failed with error message
 - [ ] UI shows job list with status badges
-- [ ] UI shows job detail with stage progress barsdatabase models and state management only - execution logic lives in worker
+- [ ] UI shows job detail with stage progress bars
+- [ ] Database models and state management only - execution logic lives in worker
 - [ ] UI auto-refreshes while job is running
 - [ ] All tests pass (backend + frontend)
 - [ ] Backend coverage ≥ 80%
