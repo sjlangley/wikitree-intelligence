@@ -89,11 +89,19 @@ migrations/
 Use `apps/` as the monorepo home for runnable applications. In version 1 that means:
 
 - `apps/api/` — HTTP API for UI and session management
+- `apps/worker/` — Background worker process for import job execution
 - `apps/ui/` — React frontend
 - `apps/ingestion/` — Separate WikiTree dump ingestion service (runs weekly)
 
-Use a separate worker process in v1, but keep the implementation inside `apps/api`
-until duplication is real enough to justify extraction.
+**Architectural decision (2026-04-13):** Worker extracted to separate package from the start.
+Originally planned to keep worker implementation inside `apps/api/` until duplication justified
+extraction, but separating upfront provides clearer boundaries and simpler deployment patterns.
+
+The worker is separate because:
+- Runs continuously (async job processing loop)
+- Scales independently from API (horizontal scaling for throughput)
+- Different deployment requirements (can restart without affecting user sessions)
+- Simpler dependency management (no UI/auth dependencies)
 
 The ingestion app is separate because:
 - Runs on a different schedule (weekly, not continuous)
@@ -152,7 +160,7 @@ Execution model:
 - Basic test infrastructure
 - Coverage gates established
 
-**Note:** Worker service will be added later when background job processing is implemented.
+**Update (2026-04-13):** Worker service added in PR #33 with separate package structure.
 
 Purpose:
 Create the smallest runnable project shell with coverage gates.
@@ -419,6 +427,9 @@ Implementation notes:
 
 **Status:** Next - detailed plan in [`pr6-import-job-plan.md`](./pr6-import-job-plan.md)
 
+**Update (2026-04-13):** Worker package scaffolded in PR #33 with health endpoints,
+FastAPI app structure, and CI workflows. Job processing logic still pending.
+
 Purpose:
 Create resumable staged import jobs and a worker-owned execution loop without full
 GEDCOM parsing yet. Establishes worker pattern, job lifecycle, and checkpointing system.
@@ -426,11 +437,13 @@ GEDCOM parsing yet. Establishes worker pattern, job lifecycle, and checkpointing
 Files:
 - `apps/api/src/api/import_jobs.py`
 - `apps/api/src/api/import_pipeline.py`
-- `apps/api/src/api/worker.py`
 - `apps/api/src/api/routes_imports.py`
 - `apps/api/src/api/models.py`
 - `apps/api/tests/test_import_pipeline.py`
 - `apps/api/tests/test_import_resume.py`
+- `apps/worker/src/worker/stage_runners.py`
+- `apps/worker/src/worker/job_processor.py`
+- `apps/worker/tests/test_stage_runners.py`
 - `apps/ui/src/routes/ImportJobPage.tsx`
 - `apps/ui/tests/routes/ImportJobPage.test.tsx`
 

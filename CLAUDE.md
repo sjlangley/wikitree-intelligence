@@ -28,6 +28,16 @@ WikiTree Intelligence is a local-first genealogy workbench for reconciling GEDCO
 - **Pyrefly** for static type checking
 - **Gunicorn + Uvicorn** for production deployment
 
+### Worker (`apps/worker/`)
+
+- **Python 3.12** with type hints
+- **FastAPI** for health check endpoints
+- **Background job processor** for GEDCOM import pipeline
+- **PostgreSQL-backed queue** with lease-based job claiming
+- **Pytest** for unit testing
+- **Ruff** for linting and formatting
+- **Pyrefly** for static type checking
+
 ### E2E Testing
 
 - Playwright in `e2e/` directory
@@ -474,6 +484,20 @@ apps/api/
     ├── conftest.py          # Shared fixtures
     ├── wikitree/            # WikiTree integration tests
     └── test_*.py            # Test modules
+
+apps/worker/
+├── src/
+│   └── worker/
+│       ├── routes/          # Health check endpoints
+│       ├── models/          # Pydantic models
+│       ├── app.py           # FastAPI application
+│       ├── enums.py         # Worker-specific enums
+│       ├── logging.py       # Logging configuration
+│       └── settings.py      # Worker configuration
+└── tests/
+    ├── conftest.py          # Shared fixtures
+    └── routers/             # Route tests
+        └── test_health.py   # Health endpoint tests
 ```
 
 ### FastAPI Endpoint Guidelines
