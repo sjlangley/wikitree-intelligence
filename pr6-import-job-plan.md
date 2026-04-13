@@ -950,20 +950,20 @@ This PR establishes infrastructure only. Later PRs will:
 
 **UNRESOLVED:** 0 decisions pending
 
-**CRITICAL GAPS RESOLVED:**
-- Gap #3: FileNotFoundError handler added to stage_runners (fail job gracefully if GEDCOM deleted)
-- Gap #4: DB connection loss - accepted (rely on job reclaim via heartbeat timeout)
-- Gap #8: Duplicate batch work on crash - accepted (rare, stubs don't care, real parsing will address)
+**CRITICAL GAPS PLANNED FOR IMPLEMENTATION:**
+- Gap #3: Add a `FileNotFoundError` handler to `stage_runners` so the job fails gracefully if the GEDCOM file is deleted
+- Gap #4: DB connection loss - accepted plan decision (rely on job reclaim via heartbeat timeout)
+- Gap #8: Duplicate batch work on crash - accepted plan decision (rare, stubs don't care, real parsing will address)
 
-**PERFORMANCE OPTIMIZATIONS APPLIED:**
-1. N+1 query → SQLAlchemy joinedload() for job+stages
-2. Double file read → single-pass validation
-3. Missing indexes → composite index on (status, created_at)
-4. Aggressive polling → exponential backoff (2s→5s→10s)
-5. Limit enforcement → Pydantic Field(le=100)
-6. Heartbeat writes → 60s interval (halved from 30s)
-7. Unconditional JSONB updates → conditional updates
-8. File size enforcement → FastAPI Form max_size validation
+**PERFORMANCE OPTIMIZATIONS TO IMPLEMENT:**
+1. N+1 query → use SQLAlchemy `joinedload()` for job + stages
+2. Double file read → switch to single-pass validation
+3. Missing indexes → add a composite index on `(status, created_at)`
+4. Aggressive polling → implement exponential backoff (2s→5s→10s)
+5. Limit enforcement → enforce via Pydantic `Field(le=100)`
+6. Heartbeat writes → use a 60s interval (halved from 30s)
+7. Unconditional JSONB updates → make updates conditional
+8. File size enforcement → enforce via FastAPI Form `max_size` validation
 
 **SCOPE ADDITIONS:**
 - Worker health endpoints (`/health/live`, `/health/ready`) moved from TODO to base scope - essential for production deployment (adds ~15 min)
