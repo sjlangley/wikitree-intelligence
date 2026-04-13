@@ -43,6 +43,15 @@ This repo is in active development.
 - UI: WikiTree settings page with connect/disconnect flow
 - Coverage: 114 backend tests (92.24%), 44 frontend tests (100% passing)
 
+✅ **Worker Package Scaffold** (PR #33, pending merge 2026-04-13)
+- Separate `apps/worker/` package with FastAPI structure
+- Health endpoints: `/health/live` (liveness) and `/health/ready` (readiness)
+- Worker ID auto-generation from hostname and PID
+- Docker integration with docker-compose.yml
+- CI workflows for worker tests, linting, and Docker builds
+- Comprehensive README with architecture, scaling, and troubleshooting guides
+- Coverage: 2 tests passing, 100% worker routes coverage
+
 ### In Progress
 
 **Next:** Import job infrastructure (PR6) - see [`pr6-import-job-plan.md`](./pr6-import-job-plan.md) for detailed implementation plan.
@@ -61,8 +70,8 @@ Planning and architecture documentation:
 ## Planned Stack
 
 - `apps/api/` — Python backend
+- `apps/worker/` — Background worker process for staged import/search jobs
 - `apps/ingestion/` — WikiTree dump loading service (runs weekly)
-- planned background worker component for staged import/search jobs
 - `apps/ui/` — React + TypeScript frontend
 - `apps/api/tests/` — backend tests
 - `apps/ui/tests/` — frontend tests

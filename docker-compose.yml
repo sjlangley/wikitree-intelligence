@@ -1,5 +1,4 @@
 
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -30,7 +29,7 @@ services:
     restart: unless-stopped
     environment:
       # Server configuration
-      PORT: 8080
+      PORT: ${BACKEND_PORT:-8080}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENVIRONMENT: ${ENVIRONMENT:-development}
 
@@ -46,7 +45,7 @@ services:
       # Database configuration
       DATABASE_URL: postgresql+asyncpg://wikitree:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/wikitree_intelligence
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,7 +54,37 @@ services:
     networks:
       - wikitree-network
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\" || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:${BACKEND_PORT:-8080}/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build:
+      context: ./apps/worker
+      dockerfile: Dockerfile
+    container_name: wikitree-intelligence-worker
+    restart: unless-stopped
+    environment:
+      # Server configuration
+      PORT: ${WORKER_PORT:-8081}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+
+      # Database configuration
+      DATABASE_URL: postgresql+asyncpg://wikitree:${POSTGRES_PASSWORD:-changeme_in_production}@postgres:5432/wikitree_intelligence
+    ports:
+      - "${WORKER_PORT:-8081}:${WORKER_PORT:-8081}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - gedcom_data:/app/gedcom_data
+    networks:
+      - wikitree-network
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:${WORKER_PORT:-8081}/health/ready')\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
