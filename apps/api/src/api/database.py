@@ -68,7 +68,12 @@ class ImportJob(SQLModel, table=True):
     __tablename__ = 'import_jobs'  # pyrefly: ignore[bad-override]
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: UUID = Field(foreign_key='app_users.id', index=True)
+    # NOTE: Changing user_id from UUID to str is a schema-breaking change.
+    # Existing DBs using SQLModel.metadata.create_all() won't automatically upgrade.
+    # Production deployments should use Alembic migrations for schema changes.
+    # user_id stores Google subject ID directly (not FK to app_users)
+    # because auth uses JWT validation, not database user lookups
+    user_id: str = Field(index=True)
     source_type: str  # gedcom | wikitree-export | manual
     original_filename: str
     stored_path: str
@@ -93,7 +98,12 @@ class ImportJobStage(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     import_job_id: UUID = Field(foreign_key='import_jobs.id', index=True)
-    stage_name: str  # parse | normalize | search | match | review
+    stage_name: str  # validate | parse | normalize | search | match | review
+    # Nullable for compatibility with existing DBs until backfilled
+    # TODO: Add migration to backfill order values for existing stages
+    order: int | None = (
+        None  # Pipeline execution order (0=validate, 1=parse, etc.)
+    )
     status: ImportJobStageStatus = Field(
         sa_column=Column(
             SQLEnum(ImportJobStageStatus), index=True, nullable=False

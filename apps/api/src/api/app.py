@@ -13,7 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import api.database  # noqa: F401 - Import to register models with SQLModel metadata
 from api.enums import Environment
 from api.logging import setup_logging
-from api.routes import auth, health, user, wikitree
+from api.routes import auth, health, import_jobs, user, wikitree
 from api.settings import Settings, settings
 
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ if settings.client_origins:
         CORSMiddleware,
         allow_origins=settings.client_origins,
         allow_credentials=True,
-        allow_methods=['GET', 'POST'],
+        allow_methods=['GET', 'POST', 'DELETE', 'OPTIONS'],
         allow_headers=['Content-Type', 'Authorization'],
     )
 
@@ -148,5 +148,6 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix='/auth')
 app.include_router(health.router, prefix='/health')
+app.include_router(import_jobs.router, prefix='/api')
 app.include_router(user.router, prefix='/user')
 app.include_router(wikitree.router, prefix='/api')
