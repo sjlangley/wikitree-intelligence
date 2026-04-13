@@ -110,7 +110,7 @@ claim_next_job(worker_id: str) -> ImportJob | None:
 **Error Handling:**
 - FileNotFoundError handler in stage_runners (fail job gracefully if GEDCOM file deleted mid-processing)
 
-## Files to Create/Modify (15 files)
+## Files to Create/Modify (10 files)
 
 ### Backend API (4 files)
 
